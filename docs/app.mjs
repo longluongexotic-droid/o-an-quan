@@ -3,7 +3,7 @@ import { INITIAL_STATE, TURN_LIMIT, cloneState, legalMoves, playMove, solve } fr
 const $ = selector => document.querySelector(selector);
 const optimal = solve(INITIAL_STATE, TURN_LIMIT);
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
-let state = cloneState(INITIAL_STATE), history = [], selected = null, direction = 1, hintPit = null;
+let state = cloneState(INITIAL_STATE), history = [], selected = null, direction = 1;
 let busy = false, skipAnimation = false, soundEnabled = false, audioContext;
 const pitNumber = pit => 12 - pit;
 const directionName = value => value === 1 ? 'trái' : 'phải';
@@ -13,7 +13,7 @@ const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, millise
 
 function message(text, kind = '') {
   const element = $('#game-message');element.className = `game-message ${kind}`;element.replaceChildren();
-  const icon = document.createElement('span');icon.className = 'message-icon';icon.textContent = kind === 'good' ? '✓' : kind === 'hint' ? '✳' : '↖';
+  const icon = document.createElement('span');icon.className = 'message-icon';icon.textContent = kind === 'good' ? '✓' : '↖';
   const copy = document.createElement('span');copy.textContent = text;element.append(icon, copy);
 }
 
@@ -33,7 +33,7 @@ function renderBoard(position = state, action = null) {
   for (const index of [0, 1, 2, 3, 4, 5, 6, 11, 10, 9, 8, 7]) {
     const quan = index === 0 || index === 6, hasQuan = quan && position.quan[index === 0 ? 0 : 1], own = index >= 7, count = position.board[index];
     const pit = document.createElement('button');pit.type = 'button';pit.dataset.pit = index;
-    pit.className = `pit ${quan ? `quan quan-${index === 0 ? 'left' : 'right'}` : own ? 'own' : 'top'}${count || hasQuan ? '' : ' empty'}${selected === index && !busy ? ' selected' : ''}${hintPit === index && !busy ? ' hinted' : ''}${action?.pit === index ? action.type === 'capture' ? ' capturing' : ' current-action' : ''}`;
+    pit.className = `pit ${quan ? `quan quan-${index === 0 ? 'left' : 'right'}` : own ? 'own' : 'top'}${count || hasQuan ? '' : ' empty'}${selected === index && !busy ? ' selected' : ''}${action?.pit === index ? action.type === 'capture' ? ' capturing' : ' current-action' : ''}`;
     pit.style.gridColumn = quan ? index === 0 ? 1 : 7 : own ? 13 - index : index + 1;
     if (!quan) pit.style.gridRow = own ? 2 : 1;
     pit.disabled = !legal.has(index);
@@ -73,15 +73,15 @@ function renderControls() {
   document.querySelectorAll('.turn-dots i').forEach((dot, i) => { dot.className = i < state.turns ? 'done' : i === state.turns && !done ? 'current' : ''; });
   $('#selection-label').textContent = selected !== null ? `Ô ${pitNumber(selected)} · ${state.board[selected] || 1} DÂN · CHỌN CHIỀU` : 'CHỌN CHIỀU RẢI QUÂN';
   for (const [id, value] of [['#direction-left', 1], ['#direction-right', -1]]) { $(id).classList.toggle('active', direction === value);$(id).setAttribute('aria-pressed', String(direction === value));$(id).disabled = busy || done; }
-  $('#play-button').disabled = busy || done || selected === null;$('#undo-button').disabled = busy || history.length === 0;$('#reset-button').disabled = busy;$('#hint-button').disabled = busy;
-  $('#hint-label').textContent = done ? 'Xem kết quả' : 'Gợi ý một nước';$('#skip-button').hidden = !busy;
+  $('#play-button').disabled = busy || done || selected === null;$('#undo-button').disabled = busy || history.length === 0;$('#reset-button').disabled = busy;
+  $('#result-button').hidden = !done;$('#result-button').disabled = busy;$('#skip-button').hidden = !busy;
 }
 
 function render() { renderBoard();renderScore();renderHistory();renderControls(); }
 
 function selectPit(pit, focus = false) {
   if (busy || finished() || !legalMoves(state).some(move => move.pit === pit)) return;
-  selected = pit;hintPit = null;renderBoard();renderControls();
+  selected = pit;renderBoard();renderControls();
   const refill = state.board.every((count, i) => i < 7 || count === 0);
   message(refill ? `Phía bạn đã hết quân. Nước này dùng 5 điểm để đặt lại 5 dân, rồi đi ô ${pitNumber(pit)}.` : `Đã chọn ô ${pitNumber(pit)} có ${state.board[pit]} dân. Chọn chiều rải rồi đi nước này.`);
   if (focus) $(`[data-pit="${pit}"]`).focus({ preventScroll: true });
@@ -112,7 +112,7 @@ async function executeMove(pit = selected, value = direction) {
   if (busy || finished() || pit === null) throw new Error('Chưa chọn ô hoặc thử thách đã kết thúc.');
   if (!legalMoves(state).some(move => move.pit === pit && move.direction === value)) throw new Error('Ô hoặc chiều rải không hợp lệ.');
   const before = cloneState(state), result = playMove(state, pit, value, { trace: true });
-  busy = true;skipAnimation = reducedMotion.matches;selected = null;hintPit = null;renderControls();renderBoard();
+  busy = true;skipAnimation = reducedMotion.matches;selected = null;renderControls();renderBoard();
   const duration = Math.min(190, 6200 / Math.max(1, result.trace.length));
   for (const event of result.trace) {
     if (skipAnimation) break;
@@ -131,22 +131,15 @@ async function executeMove(pit = selected, value = direction) {
   return { score: state.score, turn: state.turns, gained: result.gained, cost: result.cost, finished: finished(), board: state.board.slice(), quan: state.quan.slice() };
 }
 
-function showHint() {
-  if (busy) return;if (finished()) { showResult();return; }
-  const answer = solve(state, TURN_LIMIT - state.turns);if (!answer.bestMove) return;
-  selected = answer.bestMove.pit;direction = answer.bestMove.direction;hintPit = selected;renderBoard();renderControls();
-  message(`Thử ô ${pitNumber(selected)}, rải sang ${directionName(direction)}. Từ thế cờ hiện tại, điểm cuối cao nhất là ${answer.maxScore}.`, 'hint');
-}
-
 function undo() {
   if (busy || !history.length) return;
-  const last = history.pop();state = cloneState(last.before);selected = null;hintPit = null;direction = 1;
+  const last = history.pop();state = cloneState(last.before);selected = null;direction = 1;
   $('#result-dialog').close();render();message('Đã quay lại trước nước vừa đi. Bạn có thể thử một phương án khác.');
 }
 
 function reset() {
   if (busy) return;
-  state = cloneState(INITIAL_STATE);history = [];selected = null;direction = 1;hintPit = null;skipAnimation = false;
+  state = cloneState(INITIAL_STATE);history = [];selected = null;direction = 1;skipAnimation = false;
   $('#result-dialog').close();$('#solution-path').hidden = true;$('#solution-button').hidden = false;
   render();message('Chọn một ô có quân ở hàng phía bạn để bắt đầu.');
 }
@@ -169,7 +162,7 @@ function showSolution() {
 $('#pits').addEventListener('click', event => { const button = event.target.closest('[data-pit]');if (button && !button.disabled) selectPit(Number(button.dataset.pit), true); });
 $('#direction-left').addEventListener('click', () => setDirection(1));$('#direction-right').addEventListener('click', () => setDirection(-1));
 $('#play-button').addEventListener('click', () => { void executeMove().catch(error => message(error.message)); });
-$('#hint-button').addEventListener('click', showHint);$('#undo-button').addEventListener('click', undo);$('#reset-button').addEventListener('click', reset);
+$('#result-button').addEventListener('click', showResult);$('#undo-button').addEventListener('click', undo);$('#reset-button').addEventListener('click', reset);
 $('#result-replay').addEventListener('click', reset);$('#solution-button').addEventListener('click', showSolution);$('#skip-button').addEventListener('click', () => { skipAnimation = true; });
 $('#sound-button').addEventListener('click', () => { soundEnabled = !soundEnabled;updateSoundButton();if (soundEnabled) sound('drop'); });
 $('#rules-button').addEventListener('click', () => $('#rules-dialog').showModal());

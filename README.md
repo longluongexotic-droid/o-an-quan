@@ -1,6 +1,6 @@
 # Ô ăn quan — Ba nước đi
 
-Game web tiếng Việt, một thế cờ duy nhất. Người chơi đi ba lượt liên tiếp, chọn một ô dân ở hàng phía mình và một chiều rải để tối đa hóa điểm. Không có đối thủ AI. Giao diện có hoạt ảnh từng quân, âm thanh tùy chọn, hoàn tác, gợi ý theo thế cờ hiện tại, chơi lại và lời giải ở bảng kết quả.
+Game web tiếng Việt, một thế cờ duy nhất. Người chơi đi ba lượt liên tiếp, chọn một ô dân ở hàng phía mình và một chiều rải để tối đa hóa điểm. Không có đối thủ AI. Giao diện có hoạt ảnh từng quân, âm thanh tùy chọn, hoàn tác, chơi lại và lời giải ở bảng kết quả.
 
 ## Chạy trên máy
 
