@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#163e37">
+  <meta name="description" content="Một bàn ô ăn quan đã chơi dở. Ba lượt đi để tìm cách ăn được nhiều quân nhất.">
+  <title>Ô ăn quan — Ba nước đi</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23163e37'/%3E%3Crect x='5' y='10' width='30' height='20' rx='9' fill='none' stroke='%23f4ecd7' stroke-width='2'/%3E%3Cpath d='M13 10v20m7-20v20m7-20v20M13 20h14' stroke='%23f4ecd7'/%3E%3Ccircle cx='16' cy='15' r='2' fill='%23df8052'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="page">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Ô ăn quan, trang chơi"><svg viewBox="0 0 46 30" aria-hidden="true"><rect x="1.5" y="2" width="43" height="26" rx="12"/><path d="M12 2v26m7-26v26m8-26v26m7-26v26M12 15h22"/><circle cx="15.5" cy="8.5" r="2"/></svg><span>ô ăn quan<span class="brand-dot">.</span></span></a>
+      <span class="header-note">Một chút tuổi thơ. Một nước đi hay.</span>
+      <div class="header-actions"><button class="icon-button" id="sound-button" aria-label="Bật âm thanh" aria-pressed="false" title="Bật âm thanh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path id="sound-wave" d="m16 9 5 6m0-6-5 6"/></svg></button><button class="rules-button" id="rules-button"><span class="question-mark">?</span> Luật chơi</button></div>
+    </header>
+    <main>
+      <section class="intro" aria-labelledby="game-title">
+        <div><p class="eyebrow"><span class="tiny-dot"></span> CÂU ĐỐ Ô ĂN QUAN</p><h1 id="game-title">Ba nước đi<span class="title-dot">.</span></h1><p class="intro-copy">Bàn cờ đã chơi dở. Bạn có <strong>3 lượt</strong> để ăn được nhiều quân nhất.</p></div>
+        <div class="level-stamp"><span>THẾ CỜ</span><b>01</b><span>DUY NHẤT</span></div>
+      </section>
+      <div class="game-layout">
+        <section class="play-surface" aria-label="Bàn chơi ô ăn quan">
+          <div class="board-toolbar"><div class="turn-label"><span class="live-dot"></span><strong id="turn-title">Lượt của bạn</strong><span id="turn-counter">1 / 3</span></div><div class="turn-dots" aria-label="Tiến trình 3 lượt"><i></i><i></i><i></i></div></div>
+          <div class="board-scene">
+            <div class="far-side"><span></span> PHÍA ĐỐI DIỆN <span></span></div>
+            <div class="board-frame"><div class="board" id="board">
+              <svg class="board-lines" viewBox="0 0 840 300" preserveAspectRatio="none" aria-hidden="true"><path d="M121 11C52 8 13 61 12 148C11 232 52 285 122 287L718 289C792 286 829 233 828 150C828 66 788 14 718 12Z"/><path d="M122 11 123 287M241 11 240 288M360 12 361 289M480 12 478 287M599 12 601 288M718 12 717 289M122 150C302 148 526 153 718 150"/></svg>
+              <div id="pits" class="pits"></div>
+            </div></div>
+            <div class="near-side"><span class="side-line"></span><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 12 5-5 5 5"/></svg> PHÍA CỦA BẠN <span class="side-line"></span></div>
+          </div>
+          <div class="game-message" id="game-message" role="status" aria-live="polite"><span class="message-icon">↖</span><span>Chọn một ô có quân ở hàng phía bạn để bắt đầu.</span></div>
+          <div class="move-controls">
+            <div class="direction-wrap"><span class="control-label" id="selection-label">CHỌN CHIỀU RẢI QUÂN</span><div class="direction-buttons" role="group" aria-label="Chiều rải quân"><button id="direction-left" class="direction-button active" aria-pressed="true"><span>←</span> Sang trái</button><button id="direction-right" class="direction-button" aria-pressed="false">Sang phải <span>→</span></button></div></div>
+            <button class="play-button" id="play-button" disabled>Đi nước này <span>↗</span></button>
+          </div>
+          <div class="board-bottom"><span><i class="small-stone"></i> 1 dân = 1 điểm <span class="legend-divider">·</span><i class="small-stone quan-stone"></i> 1 quan = 10 điểm</span><button id="skip-button" hidden>Bỏ qua chuyển động →</button></div>
+        </section>
+        <aside class="sidebar" aria-label="Điểm số và lịch sử">
+          <section class="score-card"><div class="card-label">QUÂN BẠN ĐÃ ĂN <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14v4a7 7 0 0 1-14 0V7Zm3 0V4h8v3M12 18v3m-4 0h8M5 8H2v3c0 2 2 3 4 3m13-6h3v3c0 2-2 3-4 3"/></svg></div><div class="score-number"><span id="score">00</span><span>điểm</span></div><div class="score-breakdown" id="score-breakdown">0 dân <span>·</span> 0 quan</div><div class="target-block"><div><span>Mục tiêu tối ưu</span><strong id="target-score">— điểm</strong></div><div class="progress-track"><div id="score-progress"></div></div><p>Ăn nhiều ngay chưa chắc là nước đi tốt nhất.</p></div></section>
+          <section class="history-card"><div class="card-label">BA NƯỚC CỦA BẠN <span class="history-count" id="history-count">0/3</span></div><ol id="move-history"><li class="empty-turn"><span class="step-number">1</span><span>Chờ nước đi đầu tiên</span></li><li class="empty-turn"><span class="step-number">2</span><span>Chưa đến lượt</span></li><li class="empty-turn"><span class="step-number">3</span><span>Chưa đến lượt</span></li></ol></section>
+          <button class="hint-button" id="hint-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6m-5 3h4M8 14c-4-4-1-11 4-11s8 7 4 11c-1 1-1 2-1 2H9s0-1-1-2Z"/></svg><span id="hint-label">Gợi ý một nước</span><span>↗</span></button>
+          <div class="secondary-actions"><button id="undo-button" disabled><span>↶</span> Hoàn tác</button><span class="action-divider"></span><button id="reset-button"><span>↻</span> Chơi lại</button></div>
+        </aside>
+      </div>
+      <div class="under-board"><span class="pencil-mark">✳</span><p>Nhìn xa hơn một lượt.<br><span>Mỗi ô trống có thể mở ra một cơ hội.</span></p><span class="puzzle-mode">CHẾ ĐỘ GIẢI ĐỐ <span>•</span> KHÔNG CÓ ĐỐI THỦ</span></div>
+    </main>
+    <footer><span>Một trò chơi dân gian, một cách chơi mới.</span><span>Rải chậm thôi, nghĩ kỹ một chút.</span></footer>
+  </div>
+  <dialog id="rules-dialog" class="dialog rules-dialog"><button class="close-dialog" data-close="rules-dialog" aria-label="Đóng luật chơi">×</button><p class="eyebrow">TRƯỚC KHI RẢI QUÂN</p><h2>Luật chơi</h2><p>Đây là biến thể giải đố một người: bạn đi <strong>3 lượt liên tiếp</strong> trên cùng một bàn cờ đã chơi dở. Không có lượt của đối thủ.</p><ol class="rules-list"><li><strong>Chọn ô, chọn chiều.</strong> Bốc toàn bộ quân trong một trong 5 ô dân phía bạn. Rải từng quân vào các ô kế tiếp theo chiều đã chọn, kể cả ô quan.</li><li><strong>Rải nối tiếp.</strong> Sau quân cuối, nếu ô ngay tiếp theo là ô dân có quân, bốc ô đó và tiếp tục. Gặp ô quan có quân thì dừng.</li><li><strong>Ăn qua ô trống.</strong> Nếu ô ngay tiếp theo trống và ô sau đó có quân, ăn toàn bộ ô có quân. Tiếp tục ăn nếu lại gặp một ô trống rồi một ô có quân. Hai ô trống liên tiếp thì dừng.</li><li><strong>Tính điểm.</strong> 1 dân = 1 điểm, 1 quan = 10 điểm. Bản này cho phép ăn quan dù ô quan có ít dân; không áp dụng luật quan non.</li></ol><p class="rule-note">Nếu 5 ô phía bạn trống, dùng 5 điểm đã ăn để đặt lại mỗi ô 1 dân. Hết 3 lượt, hết cả hai quan, hoặc không còn nước hợp lệ thì kết thúc. Chỉ tính quân ăn trong thử thách, không thu quân còn lại trên bàn.</p><a class="rules-source" href="https://arxiv.org/html/2507.03711v1" target="_blank" rel="noopener">Tham khảo luật ô ăn quan ↗</a><button class="dialog-primary" data-close="rules-dialog">Hiểu rồi, vào bàn thôi →</button></dialog>
+  <dialog id="result-dialog" class="dialog result-dialog"><button class="close-dialog" data-close="result-dialog" aria-label="Đóng kết quả">×</button><p class="eyebrow">BA NƯỚC ĐI CỦA BẠN</p><div class="result-emblem" aria-hidden="true">✳</div><h2 id="result-title">Một thế cờ, nhiều cơ hội.</h2><div class="result-score"><span id="result-score">0</span><span id="result-target">/ 0 điểm</span></div><p id="result-copy"></p><div id="solution-path" hidden></div><button class="solution-button" id="solution-button">Xem cách giải tối ưu</button><button class="dialog-primary" id="result-replay">Thử lại thế cờ này ↻</button></dialog>
+  <script type="module" src="./app.mjs"></script>
+</body>
+</html>
