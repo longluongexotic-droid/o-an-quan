@@ -4,7 +4,9 @@ Game web tiếng Việt, một thế cờ duy nhất. Người chơi đi ba lư�
 
 ## Chạy trên máy
 
-Cần Node.js; không cần cài thư viện. Chạy `npm start` rồi mở http://127.0.0.1:4187. Chạy `npm test` để kiểm tra luật và lời giải. `docs/` chứa toàn bộ game có thể đưa lên hosting tĩnh. Font Google có font hệ thống dự phòng.
+Cần Node.js; không cần cài thư viện. Chạy `npm start` rồi mở http://127.0.0.1:4187. Chạy `npm test` để kiểm tra luật và lời giải. `docs/` chứa toàn bộ game có thể đưa lên hosting tĩnh. Giao diện dùng giấy ngà, mực đỏ nâu và bàn gỗ với quân dân ba sắc sỏi, quân quan bằng ngọc. Hoạt ảnh rải theo vòng cung; quân bị ăn bay về bảng điểm và hiện số điểm cộng.
+
+Font tiêu đề là **SG85-Saigon 1985** nguyên bản của Thái Hiếu, tự lưu ở `docs/fonts/SAIGON1985.ttf`. [Nguồn tác giả và điều kiện sử dụng](https://fontzin.com/10-font-sai-gon-xua/) cho phép dùng cá nhân, thương mại và nhúng web; cấm bán lại hoặc chỉnh sửa font. Readme tác giả được giữ ở `docs/fonts/README-ThaiHieu.txt`. Đoạn hướng dẫn và luật dùng font serif hệ thống để dễ đọc.
 
 ## Màn chơi và cách tính điểm
 
@@ -22,6 +24,6 @@ Chuỗi tối ưu duy nhất: ô3 sang phải (+3), ô5 sang trái (+16), ô5 sa
 - `engine.test.mjs`: 10 kiểm thử về bảo toàn quân, rải nối tiếp, chững quan, ăn liên hoàn, quan trống dân, đặt lại quân, kết thúc sớm và lời giải độc lập.
 - `docs/engine.mjs`: bản engine dùng trong game; đồng bộ từ `engine.mjs` khi sửa luật.
 - `docs/app.mjs`: điều khiển game và đăng ký WebMCP nếu trình duyệt hỗ trợ.
-- `docs/index.html`, `docs/style.css`: giao diện responsive.
+- `docs/index.html`, `docs/style.css`: giao diện responsive; `docs/motion.css`: lớp hiệu ứng chuyển động.
 
 Phím1–5 chọn ô, ←/→ chọn hướng, Enter khi đang chọn ô để đi. Hoạt ảnh tự tắt với tùy chọn giảm chuyển động của hệ điều hành.

@@ -1,0 +1,74 @@
+/* Transient board effects. Physical stone surfaces remain in style.css. */
+.motion-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+.motion-layer .flying-stone {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  opacity: 1;
+  visibility: visible;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 4px 3px #102c2859);
+}
+
+.motion-held { visibility: hidden; }
+
+.pit.motion-pit-drop {
+  box-shadow: inset 0 0 21px #f7dfa62e, inset 0 0 0 1px #ffe7b43b;
+}
+
+.pit.motion-pit-capture {
+  box-shadow: inset 0 0 32px #e8bd6959, inset 0 0 0 2px #f6da9a99;
+}
+
+.pit-ripple {
+  position: absolute;
+  inset: 8%;
+  border: 1px solid #ffebbaaa;
+  border-radius: 48%;
+  background: radial-gradient(ellipse, #ffe8a321 0%, #ffe8a300 68%);
+  pointer-events: none;
+  z-index: 5;
+}
+
+.pit-ripple.capture-ripple {
+  border-width: 2px;
+  border-color: #ffe5a4;
+  background: radial-gradient(ellipse, #f4ca6b38, #f4ca6b00 72%);
+}
+
+.score-card.motion-score-hit {
+  box-shadow: 0 0 0 3px #b77b2933, 0 0 22px #e4b65d55;
+  transition: box-shadow .16s ease-out;
+}
+
+.capture-points {
+  position: absolute;
+  z-index: 2;
+  color: #7b311e;
+  background: #fff0ce;
+  border: 1px solid #b28743;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: clamp(23px, 2.8vw, 33px);
+  font-weight: 800;
+  line-height: 1.15;
+  white-space: nowrap;
+  text-shadow: 0 1px #fff9e7;
+  box-shadow: 0 3px 12px #44301726;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-layer { display: none; }
+  .pit-ripple { display: none; }
+  .score-card.motion-score-hit { transition: none; }
+}

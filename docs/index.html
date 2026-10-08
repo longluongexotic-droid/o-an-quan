@@ -3,22 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#163e37">
+  <meta name="theme-color" content="#eee2c9">
   <meta name="description" content="Một bàn ô ăn quan đã chơi dở. Ba lượt đi để tìm cách ăn được nhiều quân nhất.">
   <title>Ô ăn quan — Ba nước đi</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23163e37'/%3E%3Crect x='5' y='10' width='30' height='20' rx='9' fill='none' stroke='%23f4ecd7' stroke-width='2'/%3E%3Cpath d='M13 10v20m7-20v20m7-20v20M13 20h14' stroke='%23f4ecd7'/%3E%3Ccircle cx='16' cy='15' r='2' fill='%23df8052'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="./style.css">
+  <link rel="preload" href="./fonts/SAIGON1985.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="./style.css?v=saigon-1985">
+  <link rel="stylesheet" href="./motion.css?v=saigon-1985">
 </head>
 <body>
   <div class="page">
     <header class="site-header">
       <a class="brand" href="./" aria-label="Ô ăn quan, trang chơi"><svg viewBox="0 0 46 30" aria-hidden="true"><rect x="1.5" y="2" width="43" height="26" rx="12"/><path d="M12 2v26m7-26v26m8-26v26m7-26v26M12 15h22"/><circle cx="15.5" cy="8.5" r="2"/></svg><span>ô ăn quan<span class="brand-dot">.</span></span></a>
-      <span class="header-note">Một chút tuổi thơ. Một nước đi hay.</span>
+      <span class="header-note">RẢI QUÂN · ĂN QUAN · NHỚ TUỔI THƠ</span>
       <div class="header-actions"><button class="icon-button" id="sound-button" aria-label="Bật âm thanh" aria-pressed="false" title="Bật âm thanh"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path id="sound-wave" d="m16 9 5 6m0-6-5 6"/></svg></button><button class="rules-button" id="rules-button"><span class="question-mark">?</span> Luật chơi</button></div>
     </header>
     <main>
       <section class="intro" aria-labelledby="game-title">
-        <div><p class="eyebrow"><span class="tiny-dot"></span> CÂU ĐỐ Ô ĂN QUAN</p><h1 id="game-title">Ba nước đi<span class="title-dot">.</span></h1><p class="intro-copy">Bàn cờ đã chơi dở. Bạn có <strong>3 lượt</strong> để ăn được nhiều quân nhất.</p></div>
+        <div><p class="eyebrow"><span class="tiny-dot">✦</span> CÂU ĐỐ DÂN GIAN</p><h1 id="game-title">Ba nước đi<span class="title-dot">.</span></h1><p class="intro-copy">Bàn cờ đã chơi dở. Bạn có <strong>3 lượt</strong> để ăn được nhiều quân nhất.</p></div>
         <div class="level-stamp"><span>THẾ CỜ</span><b>01</b><span>DUY NHẤT</span></div>
       </section>
       <div class="game-layout">
@@ -48,10 +50,10 @@
       </div>
       <div class="under-board"><span class="pencil-mark">✳</span><p>Nhìn xa hơn một lượt.<br><span>Mỗi ô trống có thể mở ra một cơ hội.</span></p><span class="puzzle-mode">CHẾ ĐỘ GIẢI ĐỐ <span>•</span> KHÔNG CÓ ĐỐI THỦ</span></div>
     </main>
-    <footer><span>Một trò chơi dân gian, một cách chơi mới.</span><span>Rải chậm thôi, nghĩ kỹ một chút.</span></footer>
+    <footer><span>Một trò chơi dân gian, một cách chơi mới.</span><span class="font-credit">Nét chữ <a href="https://fontzin.com/10-font-sai-gon-xua/" target="_blank" rel="noopener">Sài Gòn 1985 · Thái Hiếu</a></span></footer>
   </div>
   <dialog id="rules-dialog" class="dialog rules-dialog"><button class="close-dialog" data-close="rules-dialog" aria-label="Đóng luật chơi">×</button><p class="eyebrow">TRƯỚC KHI RẢI QUÂN</p><h2>Luật chơi</h2><p>Đây là biến thể giải đố một người: bạn đi <strong>3 lượt liên tiếp</strong> trên cùng một bàn cờ đã chơi dở. Không có lượt của đối thủ.</p><ol class="rules-list"><li><strong>Chọn ô, chọn chiều.</strong> Bốc toàn bộ quân trong một trong 5 ô dân phía bạn. Rải từng quân vào các ô kế tiếp theo chiều đã chọn, kể cả ô quan.</li><li><strong>Rải nối tiếp.</strong> Sau quân cuối, nếu ô ngay tiếp theo là ô dân có quân, bốc ô đó và tiếp tục. Gặp ô quan có quân thì dừng.</li><li><strong>Ăn qua ô trống.</strong> Nếu ô ngay tiếp theo trống và ô sau đó có quân, ăn toàn bộ ô có quân. Tiếp tục ăn nếu lại gặp một ô trống rồi một ô có quân. Hai ô trống liên tiếp thì dừng.</li><li><strong>Tính điểm.</strong> 1 dân = 1 điểm, 1 quan = 10 điểm. Bản này cho phép ăn quan dù ô quan có ít dân; không áp dụng luật quan non.</li></ol><p class="rule-note">Nếu 5 ô phía bạn trống, dùng 5 điểm đã ăn để đặt lại mỗi ô 1 dân. Hết 3 lượt, hết cả hai quan, hoặc không còn nước hợp lệ thì kết thúc. Chỉ tính quân ăn trong thử thách, không thu quân còn lại trên bàn.</p><a class="rules-source" href="https://arxiv.org/html/2507.03711v1" target="_blank" rel="noopener">Tham khảo luật ô ăn quan ↗</a><button class="dialog-primary" data-close="rules-dialog">Hiểu rồi, vào bàn thôi →</button></dialog>
   <dialog id="result-dialog" class="dialog result-dialog"><button class="close-dialog" data-close="result-dialog" aria-label="Đóng kết quả">×</button><p class="eyebrow">BA NƯỚC ĐI CỦA BẠN</p><div class="result-emblem" aria-hidden="true">✳</div><h2 id="result-title">Một thế cờ, nhiều cơ hội.</h2><div class="result-score"><span id="result-score">0</span><span id="result-target">/ 0 điểm</span></div><p id="result-copy"></p><div id="solution-path" hidden></div><button class="solution-button" id="solution-button">Xem cách giải tối ưu</button><button class="dialog-primary" id="result-replay">Thử lại thế cờ này ↻</button></dialog>
-  <script type="module" src="./app.mjs"></script>
+  <script type="module" src="./app.mjs?v=saigon-1985"></script>
 </body>
 </html>

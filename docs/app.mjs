@@ -9,7 +9,129 @@ const pitNumber = pit => 12 - pit;
 const directionName = value => value === 1 ? 'trái' : 'phải';
 const pitName = pit => pit === 0 ? 'quan trái' : pit === 6 ? 'quan phải' : pit >= 7 ? `ô ${pitNumber(pit)} phía bạn` : `ô ${pit} phía đối diện`;
 const finished = () => state.turns >= TURN_LIMIT || state.ended || legalMoves(state).length === 0;
-const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const motionAnimations = new Set(), motionWaits = new Set();
+let motionLayer;
+
+// Timers, rather than animation.finished, keep a hidden or interrupted tab from
+// leaving the controls locked. Every wait can be completed by skip/cleanup.
+function motionPause(milliseconds) {
+  if (skipAnimation || document.hidden) return Promise.resolve();
+  return new Promise(resolve => {
+    let timer;
+    const finish = () => { clearTimeout(timer);motionWaits.delete(finish);resolve(); };
+    motionWaits.add(finish);timer = setTimeout(finish, milliseconds);
+  });
+}
+
+function clearMotion() {
+  for (const finish of [...motionWaits]) finish();
+  for (const animation of [...motionAnimations]) animation.cancel();
+  motionAnimations.clear();motionLayer?.remove();motionLayer = null;
+  document.querySelectorAll('.motion-held').forEach(stone => stone.classList.remove('motion-held'));
+  document.querySelectorAll('.motion-pit-drop, .motion-pit-capture, .motion-score-hit').forEach(element => element.classList.remove('motion-pit-drop', 'motion-pit-capture', 'motion-score-hit'));
+  document.querySelectorAll('.pit-ripple').forEach(ripple => ripple.remove());
+  $('#score')?.classList.remove('score-bump');
+}
+
+function stopMotion() { skipAnimation = true;clearMotion(); }
+
+function effectLayer() {
+  if (!motionLayer?.isConnected) {
+    motionLayer = document.createElement('div');motionLayer.className = 'motion-layer';motionLayer.setAttribute('aria-hidden', 'true');document.body.append(motionLayer);
+  }
+  return motionLayer;
+}
+
+function animateElement(element, frames, duration, { remove = false, delay = 0, easing = 'linear' } = {}) {
+  if (skipAnimation || document.hidden || !element.animate) { if (remove) element.remove();return; }
+  try {
+    const animation = element.animate(frames, { duration, delay, easing, fill: 'both' });motionAnimations.add(animation);
+    void animation.finished.catch(() => {}).finally(() => { motionAnimations.delete(animation);if (remove) element.remove();else animation.cancel(); });
+    return animation;
+  } catch { if (remove) element.remove(); }
+}
+
+function viewportPoint(x, y, margin = 18) {
+  return { x: Math.max(margin, Math.min(window.innerWidth - margin, x)), y: Math.max(margin, Math.min(window.innerHeight - margin, y)) };
+}
+
+function centerOf(element) {
+  const bounds = element.getBoundingClientRect();return viewportPoint(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
+}
+
+function stoneFlight(source, start, end, duration, capture = false, delay = 0) {
+  const bounds = source.getBoundingClientRect(), stone = source.cloneNode(false);
+  stone.classList.remove('motion-held');stone.classList.add('flying-stone');stone.removeAttribute('data-stone');stone.setAttribute('aria-hidden', 'true');
+  stone.style.width = `${Math.max(6, bounds.width)}px`;stone.style.height = `${Math.max(6, bounds.height)}px`;
+  effectLayer().append(stone);
+  const angle = Number.parseFloat(source.style.getPropertyValue('--r')) || (capture ? -13 : 0);
+  const distance = Math.hypot(end.x - start.x, end.y - start.y), lift = Math.min(capture ? 88 : 60, Math.max(22, distance * .2));
+  const origin = { x: start.x, y: capture ? start.y : Math.max(12, start.y - 12) };
+  const arcTop = Math.max(12, Math.min(origin.y, end.y) - lift);
+  const control = { x: origin.x + (end.x - origin.x) * (capture ? .32 : .45), y: Math.max(12, 2 * arcTop - (origin.y + end.y) / 2) };
+  const frame = (x, y, rotate, scale = 1, opacity = 1) => ({ transform: `translate3d(${x}px,${y}px,0) translate(-50%,-50%) rotate(${rotate}deg) scale(${scale})`, opacity });
+  // Sample a quadratic curve closely enough to keep the flight rounded even
+  // across the long diagonal from a quan pit to the score card.
+  const frames = Array.from({ length: 13 }, (_, index) => {
+    const t = index / 12, u = 1 - t, liftScale = Math.sin(Math.PI * t);
+    const x = u * u * origin.x + 2 * u * t * control.x + t * t * end.x;
+    const y = u * u * origin.y + 2 * u * t * control.y + t * t * end.y;
+    return {
+      ...frame(x, y, angle + (capture ? 75 * t : 25 * liftScale), capture ? 1 + .08 * liftScale - .62 * t : .92 + .08 * t + .12 * liftScale, capture ? 1 - .2 * t : 1),
+      offset: t * (capture ? .86 : 1),
+    };
+  });
+  if (capture) frames.push({ ...frame(end.x, Math.max(12, end.y - 4), angle + 90, .1, 0), offset: 1 });
+  animateElement(stone, frames, duration, { remove: true, delay, easing: capture ? 'cubic-bezier(.28,.02,.5,1)' : 'cubic-bezier(.27,.1,.53,1)' });
+}
+
+function pulsePit(pit, capture, duration) {
+  pit.classList.add(capture ? 'motion-pit-capture' : 'motion-pit-drop');
+  const ripple = document.createElement('span');ripple.className = `pit-ripple${capture ? ' capture-ripple' : ''}`;pit.append(ripple);
+  animateElement(ripple, [{ transform: 'scale(.55)', opacity: .75 }, { transform: 'scale(1.18)', opacity: 0 }], duration, { remove: true, easing: 'ease-out' });
+}
+
+async function animateDrop(event, duration, pendingScore) {
+  const sourcePit = $(`[data-pit="${event.from}"]`), start = sourcePit ? centerOf(sourcePit) : null;
+  renderBoard(event.state, event);renderScore(event.state, pendingScore);
+  const destination = $(`[data-pit="${event.pit}"]`), stones = destination.querySelectorAll('.pebble'), landing = stones[stones.length - 1];
+  pulsePit(destination, false, duration);
+  if (!start || !landing) { await motionPause(duration);return; }
+  const end = centerOf(landing), travel = duration * .7;
+  // A crowded pit displays at most sixteen stones; don't hide an old stone in
+  // that case. The count still shows every civilian in the engine position.
+  if (event.state.board[event.pit] <= 16) landing.classList.add('motion-held');
+  stoneFlight(landing, start, end, travel);
+  await motionPause(travel);
+  landing.classList.remove('motion-held');
+  if (skipAnimation || !landing.isConnected) return;
+  const rotation = landing.style.getPropertyValue('--r');
+  animateElement(landing, [
+    { transform: `translate(-50%,-50%) translateY(-3px) rotate(${rotation}) scale(1.08,.9)` },
+    { transform: `translate(-50%,-50%) translateY(1px) rotate(calc(${rotation} + 7deg)) scale(.94,1.04)`, offset: .5 },
+    { transform: `translate(-50%,-50%) rotate(${rotation}) scale(1)` },
+  ], duration * .3, { easing: 'ease-out' });
+  await motionPause(duration * .3);
+}
+
+async function animateCapture(event, duration, pendingScore) {
+  const capturedPit = $(`[data-pit="${event.pit}"]`);
+  const sources = [...capturedPit.querySelectorAll('.pebble, .big-pebble')].map(stone => ({ stone, start: centerOf(stone) }));
+  const score = $('#score'), destination = centerOf(score);
+  // Snapshot physical stones before replacing the board with the AFTER state.
+  for (const [index, source] of sources.entries()) {
+    const spread = sources.length > 1 ? Math.min(90, duration * .18) * index / (sources.length - 1) : 0;
+    stoneFlight(source.stone, source.start, destination, duration * .78, true, spread);
+  }
+  renderBoard(event.state, event);renderScore(event.state, pendingScore);
+  pulsePit($(`[data-pit="${event.pit}"]`), true, duration);
+  const card = $('.score-card');card.classList.add('motion-score-hit');
+  const points = document.createElement('span');points.className = 'capture-points';points.textContent = `+${event.points}`;
+  points.style.left = `${destination.x}px`;points.style.top = `${Math.max(30, destination.y - 18)}px`;effectLayer().append(points);
+  animateElement(points, [{ transform: 'translate(-50%,8px) scale(.86)', opacity: 0 }, { transform: 'translate(-50%,-8px) scale(1.08)', opacity: 1, offset: .28 }, { transform: 'translate(-50%,-50px) scale(1)', opacity: 0 }], duration * .82, { remove: true, delay: duration * .18, easing: 'ease-out' });
+  await motionPause(duration);
+  card.classList.remove('motion-score-hit');
+}
 
 function message(text, kind = '') {
   const element = $('#game-message');element.className = `game-message ${kind}`;element.replaceChildren();
@@ -22,7 +144,8 @@ function stoneMarkup(index, count) {
   for (let i = 0; i < Math.min(count, 16); i++) {
     const seed = (index * 137 + i * 83) % 101;
     const x = 19 + (i % 4) * 21 + (seed % 9) - 4, y = 14 + Math.floor(i / 4) * 22 + (seed % 11) - 5;
-    html += `<i class="pebble" style="--x:${x}%;--y:${y}%;--r:${seed * 3}deg"></i>`;
+    const tone = ['chalk', 'ash', 'sand'][(index + i * 2) % 3];
+    html += `<i class="pebble tone-${tone} shape-${seed % 3}" aria-hidden="true" data-stone="${i}" style="--x:${x}%;--y:${y}%;--r:${seed * 3}deg"></i>`;
   }
   return html;
 }
@@ -39,18 +162,18 @@ function renderBoard(position = state, action = null) {
     pit.disabled = !legal.has(index);
     pit.setAttribute('aria-label', `${pitName(index)}, ${count} dân${hasQuan ? ', 1 quan' : ''}${own && !legal.has(index) && !busy && !finished() ? ', ô trống' : ''}`);
     if (own) pit.setAttribute('aria-pressed', String(selected === index));
-    pit.innerHTML = `${quan ? `<span class="quan-name">${index === 0 ? 'QUAN TRÁI' : 'QUAN PHẢI'}</span>` : ''}<span class="stones">${stoneMarkup(index, count)}</span>${hasQuan ? '<i class="big-pebble"></i>' : ''}<span class="pit-count">${count}${hasQuan ? ' + quan' : ''}</span>${own ? `<span class="pit-number">Ô ${pitNumber(index)}</span>` : ''}`;
+    pit.innerHTML = `${quan ? `<span class="quan-name">${index === 0 ? 'QUAN TRÁI' : 'QUAN PHẢI'}</span>` : ''}<span class="stones">${stoneMarkup(index, count)}</span>${hasQuan ? '<i class="big-pebble" aria-hidden="true"></i>' : ''}<span class="pit-count">${count}${hasQuan ? ' + quan' : ''}</span>${own ? `<span class="pit-number">Ô ${pitNumber(index)}</span>` : ''}`;
     fragment.append(pit);
   }
   $('#pits').replaceChildren(fragment);
 }
 
-function renderScore(position = state) {
+function renderScore(position = state, pendingScore = null) {
   $('#score').textContent = String(position.score).padStart(2, '0');$('#target-score').textContent = `${optimal.maxScore} điểm`;
   $('#score-progress').style.width = `${Math.min(100, position.score / optimal.maxScore * 100)}%`;
-  const captures = history.flatMap(turn => turn.result.captured);
+  const captures = [...history.flatMap(turn => turn.result.captured), ...(pendingScore?.captured ?? [])];
   const civilians = captures.reduce((total, capture) => total + capture.civilians, 0), quan = captures.filter(capture => capture.quan).length;
-  const cost = history.reduce((total, turn) => total + turn.result.cost, 0);
+  const cost = history.reduce((total, turn) => total + turn.result.cost, 0) + (pendingScore?.cost ?? 0);
   $('#score-breakdown').innerHTML = `${civilians} dân <span>·</span> ${quan} quan${cost ? `<small>−${cost} điểm đặt lại quân</small>` : ''}`;
 }
 
@@ -112,19 +235,29 @@ async function executeMove(pit = selected, value = direction) {
   if (busy || finished() || pit === null) throw new Error('Chưa chọn ô hoặc thử thách đã kết thúc.');
   if (!legalMoves(state).some(move => move.pit === pit && move.direction === value)) throw new Error('Ô hoặc chiều rải không hợp lệ.');
   const before = cloneState(state), result = playMove(state, pit, value, { trace: true });
-  busy = true;skipAnimation = reducedMotion.matches;selected = null;renderControls();renderBoard();
-  const duration = Math.min(190, 6200 / Math.max(1, result.trace.length));
+  clearMotion();busy = true;skipAnimation = reducedMotion.matches || document.hidden;selected = null;renderControls();renderBoard();
+  const weight = result.trace.reduce((total, event) => total + (event.type === 'capture' ? 3 : event.type === 'pickup' ? .6 : event.type === 'end' ? 0 : 1), 0);
+  const duration = Math.min(250, 7200 / Math.max(1, weight));
+  // Only traced captures have reached the displayed score. The completed
+  // turn enters history once, after its animation (or skip) has finished.
+  const pendingScore = { captured: [], cost: 0 };
   for (const event of result.trace) {
     if (skipAnimation) break;
-    renderBoard(event.state, event);renderScore(event.state);
+    if (event.type === 'capture') pendingScore.captured.push(event);
+    else if (event.type === 'refill') pendingScore.cost += event.cost;
     if (event.type === 'pickup') message(`Bốc ${event.count} dân từ ${pitName(event.pit)}${event.relay ? ' để rải tiếp' : ''}.`);
     else if (event.type === 'drop') message(`Rải 1 dân vào ${pitName(event.pit)} · Còn ${event.hand} dân trên tay.`);
     else if (event.type === 'capture') message(`Ăn ${event.civilians} dân${event.quan ? ' và 1 quan' : ''} ở ${pitName(event.pit)}. +${event.points} điểm!`, 'good');
     else if (event.type === 'refill') message('Dùng 5 điểm đặt lại mỗi ô phía bạn 1 dân.');
     if (event.type === 'drop' || event.type === 'capture') sound(event.type);
-    if (event.type !== 'end') await sleep(event.type === 'capture' ? Math.min(420, duration * 2) : duration);
+    if (event.type === 'drop') await animateDrop(event, duration, pendingScore);
+    else if (event.type === 'capture') await animateCapture(event, Math.min(700, duration * 3), pendingScore);
+    else {
+      renderBoard(event.state, event);renderScore(event.state, pendingScore);
+      if (event.type !== 'end') await motionPause(event.type === 'pickup' ? Math.min(160, duration * .6) : duration);
+    }
   }
-  state = result.state;history.push({ before, pit, direction: value, result });busy = false;render();
+  clearMotion();state = result.state;history.push({ before, pit, direction: value, result });busy = false;render();
   $('#score').classList.remove('score-bump');void $('#score').offsetWidth;$('#score').classList.add('score-bump');
   if (finished()) { message(`Thử thách kết thúc. Bạn đạt ${state.score} / ${optimal.maxScore} điểm.`, 'good');showResult(); }
   else message(result.net > 0 ? `Nước vừa rồi ăn được ${result.gained} điểm${result.cost ? `, trừ ${result.cost} điểm đặt lại quân` : ''}. Còn ${TURN_LIMIT - state.turns} lượt — chọn ô tiếp theo.` : `Nước vừa rồi ${result.cost ? `tốn ${result.cost} điểm đặt lại quân và ` : ''}chưa ăn được quân. Còn ${TURN_LIMIT - state.turns} lượt.`, result.net > 0 ? 'good' : '');
@@ -133,12 +266,14 @@ async function executeMove(pit = selected, value = direction) {
 
 function undo() {
   if (busy || !history.length) return;
+  clearMotion();
   const last = history.pop();state = cloneState(last.before);selected = null;direction = 1;
   $('#result-dialog').close();render();message('Đã quay lại trước nước vừa đi. Bạn có thể thử một phương án khác.');
 }
 
 function reset() {
   if (busy) return;
+  clearMotion();
   state = cloneState(INITIAL_STATE);history = [];selected = null;direction = 1;skipAnimation = false;
   $('#result-dialog').close();$('#solution-path').hidden = true;$('#solution-button').hidden = false;
   render();message('Chọn một ô có quân ở hàng phía bạn để bắt đầu.');
@@ -163,7 +298,10 @@ $('#pits').addEventListener('click', event => { const button = event.target.clos
 $('#direction-left').addEventListener('click', () => setDirection(1));$('#direction-right').addEventListener('click', () => setDirection(-1));
 $('#play-button').addEventListener('click', () => { void executeMove().catch(error => message(error.message)); });
 $('#result-button').addEventListener('click', showResult);$('#undo-button').addEventListener('click', undo);$('#reset-button').addEventListener('click', reset);
-$('#result-replay').addEventListener('click', reset);$('#solution-button').addEventListener('click', showSolution);$('#skip-button').addEventListener('click', () => { skipAnimation = true; });
+$('#result-replay').addEventListener('click', reset);$('#solution-button').addEventListener('click', showSolution);$('#skip-button').addEventListener('click', stopMotion);
+document.addEventListener('visibilitychange', () => { if (document.hidden) stopMotion(); });
+window.addEventListener('pagehide', stopMotion);
+reducedMotion.addEventListener('change', event => { if (event.matches) stopMotion(); });
 $('#sound-button').addEventListener('click', () => { soundEnabled = !soundEnabled;updateSoundButton();if (soundEnabled) sound('drop'); });
 $('#rules-button').addEventListener('click', () => $('#rules-dialog').showModal());
 document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.close).close()));
