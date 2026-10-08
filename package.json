@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "test": "node --test engine.test.mjs"
+    "test": "node --test engine.test.mjs tests/*.test.mjs",
+    "check:leaderboard": "node scripts/generate-leaderboard-paths.mjs --check"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
   }
 }

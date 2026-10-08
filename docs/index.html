@@ -8,7 +8,7 @@
   <title>Ô ăn quan — Ba nước đi</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Crect width='40' height='40' rx='10' fill='%23163e37'/%3E%3Crect x='5' y='10' width='30' height='20' rx='9' fill='none' stroke='%23f4ecd7' stroke-width='2'/%3E%3Cpath d='M13 10v20m7-20v20m7-20v20M13 20h14' stroke='%23f4ecd7'/%3E%3Ccircle cx='16' cy='15' r='2' fill='%23df8052'/%3E%3C/svg%3E">
   <link rel="preload" href="./fonts/SAIGON1985.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="stylesheet" href="./style.css?v=saigon-1985-2">
+  <link rel="stylesheet" href="./style.css?v=leaderboard-1">
   <link rel="stylesheet" href="./motion.css?v=saigon-1985">
 </head>
 <body>
@@ -23,6 +23,7 @@
         <div><p class="eyebrow"><span class="tiny-dot">✦</span> CÂU ĐỐ DÂN GIAN</p><h1 id="game-title">Ba nước đi<span class="title-dot">.</span></h1><p class="intro-copy">Bàn cờ đã chơi dở. Bạn có <strong>3 lượt</strong> để ăn được nhiều quân nhất.</p></div>
         <div class="level-stamp"><span>THẾ CỜ</span><b>01</b><span>DUY NHẤT</span></div>
       </section>
+      <div class="player-strip"><span>Người chơi: <strong id="player-display">Chưa ghi tên</strong></span><button id="change-name-button">Ghi tên <span>✎</span></button></div>
       <div class="game-layout">
         <section class="play-surface" aria-label="Bàn chơi ô ăn quan">
           <div class="board-toolbar"><div class="turn-label"><span class="live-dot"></span><strong id="turn-title">Lượt của bạn</strong><span id="turn-counter">1 / 3</span></div><div class="turn-dots" aria-label="Tiến trình 3 lượt"><i></i><i></i><i></i></div></div>
@@ -49,11 +50,18 @@
         </aside>
       </div>
       <div class="under-board"><span class="pencil-mark">✳</span><p>Nhìn xa hơn một lượt.<br><span>Mỗi ô trống có thể mở ra một cơ hội.</span></p><span class="puzzle-mode">CHẾ ĐỘ GIẢI ĐỐ <span>•</span> KHÔNG CÓ ĐỐI THỦ</span></div>
+      <section class="leaderboard" aria-labelledby="leaderboard-title">
+        <div class="leaderboard-heading"><div><p class="eyebrow">SỔ VÀNG Ô ĂN QUAN</p><h2 id="leaderboard-title">Hai mươi tay cờ</h2><p>20 người có điểm cao nhất. Mỗi người giữ một điểm tốt nhất.</p></div><button id="refresh-leaderboard" class="refresh-leaderboard">Làm mới <span>↻</span></button></div>
+        <p id="leaderboard-status" class="leaderboard-status" role="status" aria-live="polite">Đang tải bảng xếp hạng…</p>
+        <div class="leaderboard-table-wrap" hidden id="leaderboard-table-wrap"><table class="leaderboard-table"><caption class="sr-only">Bảng xếp hạng 20 người chơi cao điểm nhất</caption><thead><tr><th scope="col">HẠNG</th><th scope="col">NGƯỜI CHƠI</th><th scope="col" class="points-column">ĐIỂM</th></tr></thead><tbody id="leaderboard-rows"></tbody></table></div>
+        <p class="ranking-note">Đồng điểm: người đạt điểm đó trước xếp trên.</p>
+      </section>
     </main>
     <footer><span>Một trò chơi dân gian, một cách chơi mới.</span><span class="font-credit">Nét chữ <a href="https://fontzin.com/10-font-sai-gon-xua/" target="_blank" rel="noopener">Sài Gòn 1985 · Thái Hiếu</a></span></footer>
   </div>
+  <dialog id="player-dialog" class="dialog player-dialog" aria-labelledby="player-dialog-title"><p class="eyebrow">MỜI BẠN VÀO BÀN</p><h2 id="player-dialog-title">Ghi tên vào sổ</h2><p>Tên này sẽ xuất hiện trên bảng xếp hạng khi bạn hoàn thành thử thách.</p><form id="player-form" novalidate><label for="player-name">Tên của bạn</label><input id="player-name" name="player-name" type="text" autocomplete="nickname" maxlength="24" placeholder="Ví dụ: Minh Anh" aria-describedby="player-name-help player-error" required autofocus><small id="player-name-help">Từ 1 đến 24 ký tự. Có thể dùng tên hoặc biệt danh.</small><p id="player-error" class="form-error" role="alert" hidden></p><button type="submit" class="dialog-primary">Bắt đầu rải quân →</button><button type="button" id="cancel-name-button" class="cancel-name-button" hidden>Giữ tên hiện tại</button></form></dialog>
   <dialog id="rules-dialog" class="dialog rules-dialog"><button class="close-dialog" data-close="rules-dialog" aria-label="Đóng luật chơi">×</button><p class="eyebrow">TRƯỚC KHI RẢI QUÂN</p><h2>Luật chơi</h2><p>Đây là biến thể giải đố một người: bạn đi <strong>3 lượt liên tiếp</strong> trên cùng một bàn cờ đã chơi dở. Không có lượt của đối thủ.</p><ol class="rules-list"><li><strong>Chọn ô, chọn chiều.</strong> Bốc toàn bộ quân trong một trong 5 ô dân phía bạn. Rải từng quân vào các ô kế tiếp theo chiều đã chọn, kể cả ô quan.</li><li><strong>Rải nối tiếp.</strong> Sau quân cuối, nếu ô ngay tiếp theo là ô dân có quân, bốc ô đó và tiếp tục. Gặp ô quan có quân thì dừng.</li><li><strong>Ăn qua ô trống.</strong> Nếu ô ngay tiếp theo trống và ô sau đó có quân, ăn toàn bộ ô có quân. Tiếp tục ăn nếu lại gặp một ô trống rồi một ô có quân. Hai ô trống liên tiếp thì dừng.</li><li><strong>Tính điểm.</strong> 1 dân = 1 điểm, 1 quan = 10 điểm. Bản này cho phép ăn quan dù ô quan có ít dân; không áp dụng luật quan non.</li></ol><p class="rule-note">Nếu 5 ô phía bạn trống, dùng 5 điểm đã ăn để đặt lại mỗi ô 1 dân. Hết 3 lượt, hết cả hai quan, hoặc không còn nước hợp lệ thì kết thúc. Chỉ tính quân ăn trong thử thách, không thu quân còn lại trên bàn.</p><a class="rules-source" href="https://arxiv.org/html/2507.03711v1" target="_blank" rel="noopener">Tham khảo luật ô ăn quan ↗</a><button class="dialog-primary" data-close="rules-dialog">Hiểu rồi, vào bàn thôi →</button></dialog>
-  <dialog id="result-dialog" class="dialog result-dialog"><button class="close-dialog" data-close="result-dialog" aria-label="Đóng kết quả">×</button><p class="eyebrow">BA NƯỚC ĐI CỦA BẠN</p><div class="result-emblem" aria-hidden="true">✳</div><h2 id="result-title">Một thế cờ, nhiều cơ hội.</h2><div class="result-score"><span id="result-score">0</span><span id="result-target">/ 0 điểm</span></div><p id="result-copy"></p><div id="solution-path" hidden></div><button class="solution-button" id="solution-button">Xem cách giải tối ưu</button><button class="dialog-primary" id="result-replay">Thử lại thế cờ này ↻</button></dialog>
-  <script type="module" src="./app.mjs?v=saigon-1985"></script>
+  <dialog id="result-dialog" class="dialog result-dialog"><button class="close-dialog" data-close="result-dialog" aria-label="Đóng kết quả">×</button><p class="eyebrow">BA NƯỚC ĐI CỦA BẠN</p><div class="result-emblem" aria-hidden="true">✳</div><h2 id="result-title">Một thế cờ, nhiều cơ hội.</h2><div class="result-score"><span id="result-score">0</span><span id="result-target">/ 0 điểm</span></div><p id="result-copy"></p><p id="score-submit-status" class="score-submit-status" role="status" aria-live="polite"></p><button id="retry-score-button" class="retry-score-button" hidden>Gửi lại điểm ↻</button><div id="solution-path" hidden></div><button class="solution-button" id="solution-button">Xem cách giải tối ưu</button><button class="dialog-primary" id="result-replay">Thử lại thế cờ này ↻</button></dialog>
+  <script type="module" src="./app.mjs?v=leaderboard-1"></script>
 </body>
 </html>
