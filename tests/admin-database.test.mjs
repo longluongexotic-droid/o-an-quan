@@ -6,6 +6,7 @@ import { completedPaths, MIGRATION_URL } from '../scripts/generate-leaderboard-p
 
 const V2_URL = new URL('../supabase/migrations/202610100001_ky_lo.sql', import.meta.url);
 const ADMIN_URL = new URL('../supabase/migrations/202610100002_admin.sql', import.meta.url);
+const DELETE_URL = new URL('../supabase/migrations/202610100004_admin_delete.sql', import.meta.url);
 const uid = number => '00000000-0000-4000-8000-' + String(number).padStart(12, '0');
 const ADMIN = uid(30);
 const perfect = completedPaths().find(path => path.score === 38);
@@ -33,6 +34,7 @@ async function setup(legacy = []) {
   for (const row of legacy) await db.query("insert into oaq_private.scores values ('ba-nuoc-v1',$1,$2,$3,$4)", row);
   await db.exec(await readFile(V2_URL, 'utf8'));
   await db.exec(await readFile(ADMIN_URL, 'utf8'));
+  await db.exec(await readFile(DELETE_URL, 'utf8'));
   await db.query("insert into oaq_private.admin_allowlist(email) values ('admin@example.com')");
   const call = async (sql, params = []) => (await db.query('select ' + sql + ' as result', params)).rows[0].result;
   const status = () => call('public.oaq_admin_status()');
@@ -44,6 +46,8 @@ async function setup(legacy = []) {
       [target.id, target.name, target.override_enabled, target.override_score,
         target.is_hidden, target.revision, request, reason]);
   };
+  const remove = (row, request = uid(201), reason = 'Xóa người chơi theo yêu cầu quản lý') =>
+    call('public.oaq_admin_delete_player($1,$2,$3,$4)', [row.id, row.revision, request, reason]);
   const playerStatus = () => call('public.oaq_player_status()');
   const register = name => call('public.oaq_register_player($1)', [name]);
   const start = request => call('public.oaq_start_game($1)', [request]);
@@ -61,7 +65,7 @@ async function setup(legacy = []) {
     try { return await operation(); }
     finally { await db.exec('reset role; reset request.jwt.claim.sub;'); }
   }
-  return { db, as, call, status, list, audit, save, playerStatus, register, start, move, finish };
+  return { db, as, call, status, list, audit, save, remove, playerStatus, register, start, move, finish };
 }
 
 async function rejectsMessage(operation, message, code = 'P0001') {
@@ -76,12 +80,16 @@ test('only the verified non-anonymous allowlisted auth.users email may administe
     await db.query(`update auth.users set email='other@example.com',email_confirmed_at=now(),is_anonymous=false,
       raw_user_meta_data='{"email":"admin@example.com","role":"admin"}' where id=$1`, [uid(4)]);
     await as('anon', null, async () => {
-      for (const operation of [status, list, audit]) await assert.rejects(operation, error => error.code === '42501');
+      for (const operation of [status, list, audit,
+        () => call('public.oaq_admin_delete_player(null,null,null,null)')]) {
+        await assert.rejects(operation, error => error.code === '42501');
+      }
     });
     for (const user of [null, uid(1), uid(2), uid(3), uid(4)]) {
       await as('authenticated', user, async () => {
         for (const operation of [status, list, audit,
-          () => call('public.oaq_admin_save_player($1,null,null,null,null,null,null,null)', [uid(99)])]) {
+          () => call('public.oaq_admin_save_player($1,null,null,null,null,null,null,null)', [uid(99)]),
+          () => call('public.oaq_admin_delete_player(null,null,null,null)')]) {
           await rejectsMessage(operation, 'ADMIN_REQUIRED', '42501');
         }
       });
@@ -240,6 +248,7 @@ test('all players are searchable and paginated, public ranking stays top ten, an
       assert.deepEqual(ranked.map(row => Number(row.rank)), Array.from({ length: 10 }, (_, index) => index + 1));
     });
     await db.exec(await readFile(ADMIN_URL, 'utf8'));
+    await db.exec(await readFile(DELETE_URL, 'utf8'));
     await as('authenticated', ADMIN, async () => {
       assert.deepEqual((await list('Người 1')).players.find(row => row.id === after.id), after);
       assert.equal((await audit(after.id)).total, 1);
@@ -248,7 +257,149 @@ test('all players are searchable and paginated, public ranking stays top ten, an
     assert.equal((await db.query('select count(*)::int as count from oaq_private.scores')).rows[0].count, 15);
     const acl = (await db.query(`select p.proname,p.prosecdef,p.proconfig from pg_proc p
       join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname like 'oaq_admin_%'`)).rows;
-    assert.equal(acl.length, 4);
+    assert.equal(acl.length, 5);
     assert.ok(acl.every(row => row.prosecdef && row.proconfig.includes('search_path=""')));
+  } finally { await db.close(); }
+});
+
+test('deletion removes a complete profile and its games, preserves other players and auth users, and retains the full audit', async () => {
+  const { db, as, list, save, remove, audit, register, start, finish, playerStatus, move } = await setup();
+  let deleting;
+  let oldGame;
+  let survivor;
+  try {
+    await as('authenticated', uid(1), async () => {
+      await register('Nguyễn An');
+      await finish(await start(uid(101)));
+      oldGame = (await start(uid(102))).active_game.id;
+      await start(uid(103)); // A second request aliases the same active game.
+    });
+    await as('authenticated', uid(2), async () => {
+      await register('Bình');
+      survivor = await finish(await start(uid(104)), early);
+    });
+    await as('authenticated', ADMIN, async () => {
+      deleting = await save((await list('Nguyễn An')).players[0],
+        { name: 'Nguyễn Ánh', override_enabled: true, override_score: 13 }, uid(105));
+    });
+    const survivingRows = async () => (await db.query(`select jsonb_build_object(
+      'player',to_jsonb(players),
+      'games',(select jsonb_agg(to_jsonb(games) order by games.id) from oaq_private.games games where games.player_id=players.id),
+      'requests',(select jsonb_agg(to_jsonb(requests) order by requests.request_id) from oaq_private.game_requests requests where requests.player_id=players.id),
+      'bindings',(select jsonb_agg(to_jsonb(bindings) order by bindings.user_id) from oaq_private.player_bindings bindings where bindings.player_id=players.id)) as data
+      from oaq_private.players players where players.name='Bình'`)).rows[0].data;
+    const unaffected = await survivingRows();
+    await as('authenticated', ADMIN, async () => {
+      assert.deepEqual(await remove(deleting), { id: deleting.id, name: 'Nguyễn Ánh', deleted: true });
+      assert.equal((await list()).total, 1);
+      assert.equal((await list('Nguyễn')).total, 0);
+      const history = await audit(deleting.id);
+      assert.equal(history.total, 2);
+      const deletion = history.entries.find(entry => entry.action === 'delete');
+      const update = history.entries.find(entry => entry.action === 'update');
+      assert.equal(deletion.player_name, 'Nguyễn Ánh');
+      assert.deepEqual(deletion.before, deleting);
+      assert.equal(deletion.after, null);
+      assert.equal(deletion.reason, 'Xóa người chơi theo yêu cầu quản lý');
+      assert.equal(update.before.name, 'Nguyễn An');
+      assert.equal(update.after.name, 'Nguyễn Ánh');
+      assert.equal((await audit(null, 1, 1)).entries.length, 1);
+    });
+    for (const table of ['players', 'games', 'game_requests', 'player_bindings']) {
+      const column = table === 'players' ? 'id' : 'player_id';
+      assert.equal((await db.query(`select count(*)::int as count from oaq_private.${table} where ${column}=$1`,
+        [deleting.id])).rows[0].count, 0);
+    }
+    assert.equal((await db.query('select count(*)::int as count from auth.users where id=$1', [uid(1)])).rows[0].count, 1);
+    assert.equal((await db.query('select count(*)::int as count from oaq_private.admin_audit where player_id is null')).rows[0].count, 2);
+    assert.equal((await db.query('select count(*)::int as count from oaq_private.admin_requests')).rows[0].count, 2);
+    assert.deepEqual(await survivingRows(), unaffected);
+    await as('authenticated', uid(2), async () => assert.deepEqual(await playerStatus(), survivor));
+    await as('anon', null, async () => {
+      assert.deepEqual((await db.query('select name,score from public.oaq_top10()')).rows, [{ name: 'Bình', score: 28 }]);
+    });
+    await as('authenticated', uid(1), async () => {
+      assert.equal(await playerStatus(), null);
+      await rejectsMessage(() => start(uid(106)), 'NAME_REQUIRED');
+      await rejectsMessage(() => move(oldGame, [], perfect.moves[0]), 'NAME_REQUIRED');
+    });
+  } finally { await db.close(); }
+});
+
+test('deletion retries survive name reuse, reject changed requests and stale revisions, and roll invalid requests back', async () => {
+  const { db, as, list, save, remove, audit, register, call } = await setup();
+  let old;
+  let current;
+  let deleted;
+  try {
+    await as('authenticated', uid(1), () => register('An'));
+    await as('authenticated', ADMIN, async () => {
+      old = (await list()).players[0];
+      current = await save(old, { is_hidden: true }, uid(101));
+      await rejectsMessage(() => remove(old, uid(201)), 'ADMIN_CONFLICT');
+      for (const [patch, reason] of [
+        [{ id: null }, 'Thiếu người chơi'], [{ revision: null }, 'Thiếu phiên bản'],
+        [{ revision: -1 }, 'Sai phiên bản'], [{}, null], [{}, ''], [{}, ' '.repeat(4)],
+        [{}, 'x'.repeat(201)], [{}, 'Dòng\nkhác'],
+      ]) await rejectsMessage(() => remove({ ...current, ...patch }, uid(202), reason), 'INVALID_ADMIN_EDIT', '22023');
+      await rejectsMessage(() => call('public.oaq_admin_delete_player($1,$2,null,$3)',
+        [current.id, current.revision, 'Thiếu mã yêu cầu']), 'INVALID_ADMIN_EDIT', '22023');
+      await rejectsMessage(() => remove({ ...current, id: uid(900) }, uid(202)), 'PLAYER_NOT_FOUND');
+      await rejectsMessage(() => remove(current, uid(101)), 'ADMIN_REQUEST_CONFLICT');
+      deleted = await remove(current, uid(201), '  Xóa bản ghi trùng  ');
+      assert.deepEqual(await remove(current, uid(201), 'Xóa bản ghi trùng'), deleted);
+      await rejectsMessage(() => remove(current, uid(201), 'Lý do khác'), 'ADMIN_REQUEST_CONFLICT');
+      await rejectsMessage(() => remove(current, uid(202)), 'PLAYER_NOT_FOUND');
+      await rejectsMessage(() => save(current, {}, uid(201)), 'ADMIN_REQUEST_CONFLICT');
+      assert.equal((await audit(current.id)).total, 2);
+    });
+    await as('authenticated', uid(1), async () => {
+      const replacement = await register('An');
+      assert.equal(replacement.attempts_used, 0);
+      assert.equal(replacement.best_score, null);
+    });
+    await as('authenticated', ADMIN, async () => {
+      const replacement = (await list()).players[0];
+      assert.notEqual(replacement.id, current.id);
+      assert.deepEqual(await remove(current, uid(201), 'Xóa bản ghi trùng'), deleted);
+      assert.equal((await list()).players[0].id, replacement.id);
+      assert.equal((await audit(replacement.id)).total, 0);
+    });
+    assert.equal((await db.query('select count(*)::int as count from oaq_private.admin_requests')).rows[0].count, 2);
+    assert.equal((await db.query('select count(*)::int as count from oaq_private.admin_audit')).rows[0].count, 2);
+  } finally { await db.close(); }
+});
+
+test('deleting a renamed legacy player clears every associated old puzzle score and cannot be resurrected by migration reruns', async () => {
+  const legacy = [
+    [uid(1), 'An', 38, '2026-10-09T00:00:00Z'],
+    [uid(2), 'AN', 28, '2026-10-09T01:00:00Z'],
+    [uid(3), 'Bình', 13, '2026-10-09T02:00:00Z'],
+  ];
+  const { db, as, list, save, remove, audit, playerStatus } = await setup(legacy);
+  let renamed;
+  try {
+    await db.query("insert into oaq_private.scores values ('another-puzzle',$1,'An',38,'2026-10-09T00:00:00Z')", [uid(1)]);
+    await as('authenticated', ADMIN, async () => {
+      renamed = await save((await list('An')).players[0], { name: 'Tên đã sửa' }, uid(101));
+      await remove(renamed);
+    });
+    assert.deepEqual((await db.query('select level_id,user_id,player_name from oaq_private.scores order by level_id')).rows,
+      [{ level_id: 'another-puzzle', user_id: uid(1), player_name: 'An' },
+        { level_id: 'ba-nuoc-v1', user_id: uid(3), player_name: 'Bình' }]);
+    await db.exec(await readFile(V2_URL, 'utf8'));
+    await db.exec(await readFile(ADMIN_URL, 'utf8'));
+    await db.exec(await readFile(DELETE_URL, 'utf8'));
+    await db.exec(await readFile(DELETE_URL, 'utf8'));
+    await as('authenticated', ADMIN, async () => {
+      assert.equal((await list()).total, 1);
+      assert.equal((await list()).players[0].name, 'Bình');
+      assert.equal((await audit(renamed.id)).total, 2);
+      assert.equal((await audit(renamed.id)).entries.find(entry => entry.action === 'delete').after, null);
+    });
+    for (const user of [uid(1), uid(2)]) {
+      await as('authenticated', user, async () => assert.equal(await playerStatus(), null));
+    }
+    assert.equal((await db.query('select count(*)::int as count from auth.users')).rows[0].count, 30);
   } finally { await db.close(); }
 });

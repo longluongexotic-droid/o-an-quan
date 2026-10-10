@@ -44,6 +44,8 @@ Mở [trang quản lý](https://longluongexotic-droid.github.io/o-an-quan/admin.
 
 Quản trị viên có thể tìm tất cả người đã ghi danh, sửa tên, đặt điểm hiển thị từ 0–38 (hoặc gỡ điểm), và ẩn/khôi phục người khỏi Bảng Vàng. Tên vẫn phải duy nhất. Mỗi lần lưu cần lý do và được ghi lịch sử trước/sau; xung đột dữ liệu được phát hiện, gửi lại cùng yêu cầu không tạo lần sửa trùng.
 
+Trong cửa sổ chỉnh sửa có nút **Xóa người chơi**. Nhập lý do và xác nhận để xóa vĩnh viễn hồ sơ, điểm, ván chơi và liên kết ghi danh của đúng người đó; tên được phép đăng ký lại. Lịch sử quản trị giữ bản chụp trước khi xóa. Thao tác có kiểm tra quyền, phiên bản hồ sơ và mã yêu cầu để tránh xóa nhầm dữ liệu vừa thay đổi hoặc xử lý lặp khi mất mạng. Tài khoản Auth không bị xóa. Điểm lưu từ bản game cũ của các danh tính liên kết cũng được xóa để hồ sơ không tự xuất hiện lại khi chạy lại migration.
+
 Điểm quản trị chỉ điều chỉnh bảng xếp hạng; điểm chơi thực, lịch sử ván và giới hạn 3 ván vẫn được giữ. Bỏ chọn “Dùng điểm chơi thực” để đặt điểm riêng; bật lại để dùng kết quả game. Điểm đặt riêng tiếp tục được áp dụng cho đến khi quản trị viên chọn lại điểm chơi thực. Người bị ẩn vẫn giữ tên và lịch sử.
 
 Thiết lập trên project khác:
@@ -52,6 +54,7 @@ Thiết lập trên project khác:
 2. Chạy [`202610100003_admin_password.sql`](supabase/migrations/202610100003_admin_password.sql) để cấp quyền cho tài khoản nội bộ `quanly@trangnguyenkylo.invalid`. Địa chỉ này chỉ là mã tài khoản công khai, không nhận email và không phải thông tin bí mật.
 3. Trong Authentication → Users → Add user → Create new user, chủ project tự tạo đúng tài khoản nội bộ trên, đặt mật khẩu riêng và bật **Auto Confirm User**. Không đưa mật khẩu, secret key hoặc service-role key vào mã nguồn. Giữ bật xác minh email toàn project; backend vẫn kiểm tra tài khoản đã xác minh, từ chối người dùng anonymous và tài khoản ngoài allowlist trên từng RPC quản trị.
 4. Đăng nhập bằng mật khẩu ở trang quản lý. Không cần gửi email hay cấu hình SMTP. Nếu đổi mã tài khoản nội bộ, cập nhật đồng thời `ADMIN_ACCOUNT` trong client và allowlist private.
+5. Chạy [`202610100004_admin_delete.sql`](supabase/migrations/202610100004_admin_delete.sql) để bật nút xóa người chơi và giữ lịch sử quản trị sau khi xóa. Migration chỉ thêm chức năng; dữ liệu người chơi chỉ bị xóa khi quản trị viên xác nhận thao tác trong giao diện.
 
 `docs/admin.html`, `docs/admin.css`, `docs/admin.mjs` là giao diện; `docs/admin-client.mjs` xử lý đăng nhập và RPC. Các bảng quyền, yêu cầu lưu và lịch sử chỉnh sửa đều private; người chơi chỉ được đọc Bảng Vàng công khai như trước.
 

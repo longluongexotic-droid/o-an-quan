@@ -384,6 +384,62 @@ test('audit history validates consistent player identities, names and UUID entry
   }
 });
 
+test('player deletion sends only the authorized target, revision, request UUID and normalized reason', async t => {
+  const deleted = { id: PLAYER_ID, name: 'Nguyễn An', deleted: true };
+  let first = true;
+  const { client, calls, storage, gameSession } = await fixture(t, {
+    initialSession: session(), fetch: async () => {
+      if (first) { first = false;throw new TypeError('Lost response'); }
+      return response(deleted);
+    },
+  });
+  const payload = { id: PLAYER_ID, expectedRevision: 4, requestId: REQUEST_ID,
+    reason: '  Xóa ghi danh nhầm  ', name: 'ignored', deleteAll: true };
+  await assert.rejects(client.deleteAdminPlayer(payload), error => error.code === 'NETWORK');
+  assert.deepEqual(await client.deleteAdminPlayer(payload), deleted);
+  for (const call of calls) {
+    assert.equal(call.url, `${PROJECT_URL}/rest/v1/rpc/oaq_admin_delete_player`);
+    assert.deepEqual(call.body, { p_id: PLAYER_ID, p_expected_revision: 4,
+      p_request_id: REQUEST_ID, p_reason: 'Xóa ghi danh nhầm' });
+  }
+  assert.equal(storage.get(GAME_KEY), gameSession);
+});
+
+test('invalid deletion requests do no I/O and valid deletion still requires an admin session', async t => {
+  const { client, calls } = await fixture(t);
+  const valid = { id: PLAYER_ID, expectedRevision: 4, requestId: REQUEST_ID, reason: 'Xóa ghi danh nhầm' };
+  for (const patch of [{ id: 'bad' }, { requestId: 'bad' }, { expectedRevision: -1 },
+    { expectedRevision: 1.5 }, { reason: '' }, { reason: ' ' }, { reason: null },
+    { reason: 'x'.repeat(201) }, { reason: 'Lý do\nkhác' }, { reason: 'Lý do\u200bẩn' }]) {
+    await assert.rejects(client.deleteAdminPlayer({ ...valid, ...patch }), error => error.code === 'INVALID_INPUT');
+  }
+  await assert.rejects(client.deleteAdminPlayer(valid), error => error.code === 'AUTHORIZATION');
+  assert.deepEqual(calls, []);
+});
+
+test('delete responses cannot claim another player or a non-confirmed deletion', async t => {
+  const records = [null, { id: OTHER_ID, name: 'Nguyễn An', deleted: true },
+    { id: PLAYER_ID, name: '', deleted: true }, { id: PLAYER_ID, name: 'Nguyễn An', deleted: false }];
+  let next;
+  const { client } = await fixture(t, { initialSession: session(), fetch: async () => response(next) });
+  for (next of records) {
+    await assert.rejects(client.deleteAdminPlayer({ id: PLAYER_ID, expectedRevision: 4,
+      requestId: REQUEST_ID, reason: 'Xóa ghi danh nhầm' }), error => error.code === 'INVALID_RESPONSE');
+  }
+});
+
+test('deleted player audit retains the original snapshot and rejects inconsistent delete history', async t => {
+  const entry = auditEntry({ action: 'delete', after: null });
+  let current = entry;
+  const { client } = await fixture(t, { initialSession: session(), fetch: async () => response({ entries: [current], total: 1 }) });
+  assert.deepEqual(await client.fetchAdminAudit(), { entries: [entry], total: 1 });
+  for (const patch of [{ after: player() }, { before: null }, { player_name: 'Different player' },
+    { action: 'unknown' }, { action: 'update' }]) {
+    current = { ...entry, ...patch };
+    await assert.rejects(client.fetchAdminAudit(), error => error.code === 'INVALID_RESPONSE');
+  }
+});
+
 test('server authorization, conflict and rate-limit errors remain actionable', async t => {
   const errors = [
     [{ message: 'ADMIN_REQUIRED', code: '42501' }, 403, 'FORBIDDEN'],

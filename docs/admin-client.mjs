@@ -232,6 +232,19 @@ export async function saveAdminPlayer({ id, name, overrideEnabled, overrideScore
     p_override_score: overrideEnabled ? overrideScore : null, p_is_hidden: isHidden,
     p_expected_revision: expectedRevision, p_request_id: requestId, p_reason: reason.trim() }));
 }
+export async function deleteAdminPlayer({ id, expectedRevision, requestId, reason } = {}) {
+  if (!UUID.test(id) || !UUID.test(requestId) || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0
+    || typeof reason !== 'string' || !reason.trim() || Array.from(reason.trim()).length > 200 || /[\p{Cc}\p{Cf}]/u.test(reason)) {
+    throw new AdminError('Hãy nhập lý do xóa (1–200 ký tự, một dòng).', 'INVALID_INPUT');
+  }
+  const data = await rpc('oaq_admin_delete_player', {
+    p_id: id, p_expected_revision: expectedRevision, p_request_id: requestId, p_reason: reason.trim(),
+  });
+  let name;
+  try { name = normalizePlayerName(data?.name); } catch { throw invalid(); }
+  if (!data || data.id !== id || data.deleted !== true) throw invalid();
+  return { id: data.id, name, deleted: true };
+}
 export async function fetchAdminAudit({ playerId = null, offset = 0, limit = 25 } = {}) {
   pagination(offset, limit);
   if (playerId !== null && !UUID.test(playerId)) throw new AdminError('Mã người chơi không hợp lệ.', 'INVALID_INPUT');
@@ -239,10 +252,11 @@ export async function fetchAdminAudit({ playerId = null, offset = 0, limit = 25 
   if (!data || !Array.isArray(data.entries) || data.entries.length > limit || !Number.isSafeInteger(data.total) || data.total < data.entries.length) throw invalid();
   const entries = data.entries.map(value => {
     if (!value || !UUID.test(value.id) || !date(value.created_at) || typeof value.actor_email !== 'string' || typeof value.player_name !== 'string'
-      || typeof value.action !== 'string' || typeof value.reason !== 'string' || !value.before || !value.after) throw invalid();
+      || !['update', 'delete'].includes(value.action) || typeof value.reason !== 'string' || !value.before) throw invalid();
     const before = player(value.before);
-    const after = player(value.after);
-    if (before.id !== after.id || after.name !== value.player_name) throw invalid();
+    const after = value.action === 'delete' ? null : player(value.after);
+    if (value.action === 'delete' ? value.after !== null || before.name !== value.player_name
+      : before.id !== after.id || after.name !== value.player_name) throw invalid();
     return { id: value.id, created_at: value.created_at, actor_email: value.actor_email, player_name: value.player_name,
       action: value.action, before, after, reason: value.reason };
   });

@@ -10,7 +10,7 @@
   <link rel="preload" href="./fonts/SAIGON1985.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="./fonts/NotoSerif-vietnamese.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./style.css?v=ky-lo-2">
-  <link rel="stylesheet" href="./admin.css?v=admin-password-1">
+  <link rel="stylesheet" href="./admin.css?v=admin-delete-1">
 </head>
 <body>
   <div class="page admin-page">
@@ -73,12 +73,18 @@
       <label for="admin-edit-score">Điểm Bảng Vàng</label><input id="admin-edit-score" name="score" type="number" min="0" max="38" step="1" inputmode="numeric" aria-describedby="admin-edit-score-help"><small id="admin-edit-score-help">Bỏ chọn “Dùng điểm chơi thực” để đặt điểm từ 0 đến 38. Để trống nếu muốn gỡ điểm khỏi Bảng Vàng.</small>
       <label class="admin-check-label" for="admin-edit-hidden"><input id="admin-edit-hidden" name="hidden" type="checkbox"><span>Ẩn người chơi khỏi Bảng Vàng</span></label>
       <p id="admin-edit-attempts" class="admin-fineprint"></p>
-      <label for="admin-edit-reason">Lý do chỉnh sửa</label><textarea id="admin-edit-reason" name="reason" rows="2" maxlength="200" placeholder="Ví dụ: Sửa tên ghi nhầm" required></textarea>
+      <label for="admin-edit-reason">Lý do chỉnh sửa / xóa</label><textarea id="admin-edit-reason" name="reason" rows="2" maxlength="200" placeholder="Ví dụ: Sửa tên ghi nhầm hoặc xóa đăng ký thử" required></textarea>
       <p id="admin-edit-status" class="admin-inline-status" role="status" aria-live="polite"></p>
       <div id="admin-discard-panel" class="admin-discard-panel" hidden><p>Bạn có thay đổi chưa lưu. Bỏ các thay đổi này?</p><div><button id="admin-edit-continue" class="admin-secondary" type="button">Tiếp tục chỉnh</button><button id="admin-edit-discard" class="admin-danger" type="button">Bỏ thay đổi</button></div></div>
-      <div id="admin-edit-actions" class="admin-edit-actions"><button id="admin-edit-cancel" class="admin-secondary" type="button">Hủy</button><button id="admin-edit-save" class="admin-primary" type="submit">Lưu thay đổi →</button></div>
+      <section id="admin-delete-panel" class="admin-delete-panel" aria-labelledby="admin-delete-title" hidden>
+        <p id="admin-delete-title" class="admin-delete-title">Xóa người chơi “<strong id="admin-delete-name"></strong>”?</p>
+        <p id="admin-delete-warning">Hồ sơ, điểm và lịch sử chơi của người này sẽ bị xóa vĩnh viễn. Tên sẽ được dùng để đăng ký lại. Không thể hoàn tác.</p>
+        <p>Các chỉnh sửa chưa lưu sẽ bị bỏ. Hãy ghi lý do xóa ở ô phía trên.</p>
+        <div><button id="admin-delete-cancel" class="admin-secondary" type="button">Giữ người chơi</button><button id="admin-delete-confirm" class="admin-danger admin-delete-confirm" type="button" aria-describedby="admin-delete-warning">Xóa vĩnh viễn</button></div>
+      </section>
+      <div id="admin-edit-actions" class="admin-edit-actions"><button id="admin-edit-delete" class="admin-danger" type="button">Xóa người chơi</button><button id="admin-edit-cancel" class="admin-secondary" type="button">Hủy</button><button id="admin-edit-save" class="admin-primary" type="submit">Lưu thay đổi →</button></div>
     </form>
   </dialog>
-  <script type="module" src="./admin.mjs?v=admin-password-1"></script>
+  <script type="module" src="./admin.mjs?v=admin-delete-1"></script>
 </body>
 </html>

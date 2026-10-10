@@ -71,10 +71,17 @@
 .admin-check-label { display: flex; align-items: flex-start; gap: 9px; line-height: 1.7; cursor: pointer; }
 .admin-check-label input { accent-color: var(--green); width: 17px; height: 17px; flex-shrink: 0; margin: 3px 0 0; }
 .admin-edit-dialog .admin-fineprint { margin: 5px 0 0; }
-.admin-edit-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.admin-edit-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+#admin-edit-delete { margin-right: auto; }
 .admin-discard-panel { border: 1px solid #b99d73; background: #efe1c5; padding: 13px; margin-top: 12px; }
 .admin-discard-panel p { margin: 0 0 12px; font-size: 13px; line-height: 1.7; }
 .admin-discard-panel > div { display: flex; gap: 8px; flex-wrap: wrap; }
+.admin-delete-panel { border: 1px solid #a45b49; background: #f1dfcb; padding: 15px; margin-top: 12px; }
+.admin-delete-panel p { margin: 0 0 12px; font-size: 13px; line-height: 1.75; overflow-wrap: anywhere; }
+.admin-delete-panel .admin-delete-title { color: var(--red); font-size: 14px; }
+.admin-delete-panel > div { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.admin-delete-confirm { background: var(--red); color: #fff3d6; }
+.admin-delete-confirm:hover:not(:disabled) { background: #7f3028; }
 @media (max-width: 800px) {
   .admin-page { padding-inline: 24px; }
   .admin-intro { padding-top: 29px; }
@@ -120,5 +127,8 @@
   .admin-edit-dialog h2 { font-size: 38px; }
   .admin-edit-actions { justify-content: stretch; }
   .admin-edit-actions button { flex: 1; font-size: 13px; padding-inline: 10px; }
+  #admin-edit-delete { flex-basis: 100%; }
+  .admin-delete-panel > div { flex-direction: column; }
+  .admin-delete-panel button { width: 100%; }
   .admin-page footer { align-items: flex-start; }
 }

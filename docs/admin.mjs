@@ -1,11 +1,12 @@
 import {
+  deleteAdminPlayer,
   fetchAdminAudit,
   fetchAdminPlayers,
   getAdminStatus,
   saveAdminPlayer,
   signInAdmin,
   signOutAdmin,
-} from './admin-client.mjs?v=admin-password-1';
+} from './admin-client.mjs?v=admin-delete-1';
 
 const $ = (id) => document.getElementById(id);
 const pageSize = 20;
@@ -27,7 +28,11 @@ let auditRequest = 0;
 let editingPlayer = null;
 let originalEdit = '';
 let pendingSave = null;
+let pendingDelete = null;
+let deleteConfirmation = false;
 let saving = false;
+let deleting = false;
+let editMutation = 0;
 let loggingOut = false;
 
 function status(id, message = '', tone = '') {
@@ -49,10 +54,11 @@ function errorMessage(error) {
     GAME_CONFLICT: 'Thông tin đã thay đổi. Đóng cửa sổ này và làm mới danh sách trước khi chỉnh lại.',
     NAME_TAKEN: 'Tên này đã thuộc về một người chơi khác. Hãy chọn tên khác.',
     INVALID_NAME: 'Tên người chơi cần có 1–24 ký tự.',
+    PLAYER_NOT_FOUND: 'Người chơi này đã được xóa. Đóng cửa sổ và làm mới danh sách.',
     NETWORK_ERROR: 'Chưa kết nối được máy chủ. Hãy thử lại; thay đổi sẽ không bị gửi trùng.',
     NETWORK: 'Chưa kết nối được máy chủ. Hãy thử lại; thay đổi sẽ không bị gửi trùng.',
     CONFLICT: 'Thông tin đã thay đổi. Đóng cửa sổ này và làm mới danh sách trước khi chỉnh lại.',
-    TIMEOUT: 'Máy chủ phản hồi chậm. Hãy thử lưu lại để kiểm tra thay đổi.',
+    TIMEOUT: 'Máy chủ phản hồi chậm. Hãy thử lại để kiểm tra thay đổi.',
   };
   return messages[error?.code] || error?.message || 'Chưa thực hiện được thao tác. Hãy thử lại.';
 }
@@ -93,6 +99,9 @@ function setSignedOut() {
   pagination('audit', 0, 0, false);
   editingPlayer = null;
   pendingSave = null;
+  pendingDelete = null;
+  setEditingBusy();
+  setDeleteVisible(false);
   if ($('admin-edit-dialog').open) $('admin-edit-dialog').close();
 }
 
@@ -183,6 +192,7 @@ async function loadPlayers() {
 }
 
 function auditChanges(entry) {
+  if (entry.action === 'delete') return 'Đã xóa người chơi';
   const before = entry.before || {};
   const after = entry.after || {};
   const changes = [];
@@ -205,7 +215,7 @@ function renderAudit(entries) {
     heading.append(time);
     item.append(heading, element('p', 'admin-audit-changes', auditChanges(entry)));
     if (entry.reason) item.append(element('p', '', `Lý do: ${entry.reason}`));
-    if (entry.actor_email) item.append(element('p', 'admin-audit-actor', 'Người sửa: Quản trị viên'));
+    if (entry.actor_email) item.append(element('p', 'admin-audit-actor', 'Người thực hiện: Quản trị viên'));
     fragment.append(item);
   }
   $('admin-audit-list').replaceChildren(fragment);
@@ -254,13 +264,28 @@ function editSignature() {
 }
 
 function setDiscardVisible(visible) {
+  if (visible) setDeleteVisible(false);
   $('admin-discard-panel').hidden = !visible;
-  $('admin-edit-actions').hidden = visible;
+  $('admin-edit-actions').hidden = visible || deleteConfirmation;
   if (visible) $('admin-edit-continue').focus();
 }
 
+function setDeleteVisible(visible) {
+  deleteConfirmation = visible;
+  $('admin-delete-panel').hidden = !visible;
+  $('admin-edit-actions').hidden = visible || !$('admin-discard-panel').hidden;
+  if (visible) {
+    $('admin-delete-name').textContent = editingPlayer.name;
+    $('admin-delete-cancel').focus();
+  }
+}
+
+function isEditingBusy() {
+  return saving || deleting;
+}
+
 function closeEdit(force = false) {
-  if (saving) return;
+  if (isEditingBusy()) return;
   if (!force && editingPlayer && editSignature() !== originalEdit) {
     setDiscardVisible(true);
     return;
@@ -268,12 +293,15 @@ function closeEdit(force = false) {
   $('admin-edit-dialog').close();
   editingPlayer = null;
   pendingSave = null;
+  pendingDelete = null;
+  setDeleteVisible(false);
 }
 
 function openEdit(player) {
-  if (!player || !authenticated || playersLoading) return;
+  if (!player || !authenticated || playersLoading || editingPlayer || isEditingBusy()) return;
   editingPlayer = player;
   pendingSave = null;
+  pendingDelete = null;
   $('admin-edit-title').textContent = player.name;
   $('admin-edit-name').value = player.name;
   $('admin-edit-use-earned').checked = !player.override_enabled;
@@ -284,18 +312,22 @@ function openEdit(player) {
   $('admin-edit-earned').textContent = `Điểm chơi thực: ${scoreText(player.best_score)}.`;
   $('admin-edit-attempts').textContent = `Đã dùng ${player.attempts_used}/3 ván. Số ván chơi được giữ nguyên.`;
   status('admin-edit-status');
+  setDeleteVisible(false);
   setDiscardVisible(false);
   originalEdit = editSignature();
   $('admin-edit-dialog').showModal();
   $('admin-edit-name').focus();
 }
 
-function setSaving(value) {
-  saving = value;
-  for (const field of $('admin-edit-form').querySelectorAll('input, textarea, button')) field.disabled = value;
-  $('admin-edit-score').disabled = value || $('admin-edit-use-earned').checked;
-  $('admin-edit-close').disabled = value;
-  $('admin-edit-save').textContent = value ? 'Đang lưu…' : 'Lưu thay đổi →';
+function setEditingBusy(kind = null) {
+  saving = kind === 'save';
+  deleting = kind === 'delete';
+  const busy = isEditingBusy();
+  for (const field of $('admin-edit-form').querySelectorAll('input, textarea, button')) field.disabled = busy;
+  $('admin-edit-score').disabled = busy || $('admin-edit-use-earned').checked;
+  $('admin-edit-close').disabled = busy;
+  $('admin-edit-save').textContent = saving ? 'Đang lưu…' : 'Lưu thay đổi →';
+  $('admin-delete-confirm').textContent = deleting ? 'Đang xóa…' : 'Xóa vĩnh viễn';
 }
 
 $('admin-player-rows').addEventListener('click', (event) => {
@@ -304,7 +336,7 @@ $('admin-player-rows').addEventListener('click', (event) => {
 });
 
 $('admin-edit-form').addEventListener('input', () => {
-  if (saving) return;
+  if (isEditingBusy()) return;
   pendingSave = null;
   status('admin-edit-status');
 });
@@ -315,7 +347,7 @@ $('admin-edit-use-earned').addEventListener('change', () => {
 
 $('admin-edit-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (!editingPlayer || saving || !authenticated) return;
+  if (!editingPlayer || isEditingBusy() || deleteConfirmation || !authenticated) return;
   if (!$('admin-edit-form').reportValidity()) return;
   const values = editValues();
   if (!values.name || Array.from(values.name).length > 24) {
@@ -347,12 +379,13 @@ $('admin-edit-form').addEventListener('submit', async (event) => {
     };
   }
   const saveEpoch = sessionEpoch;
-  setSaving(true);
+  const saveMutation = ++editMutation;
+  setEditingBusy('save');
   status('admin-edit-status', 'Đang lưu thay đổi vào Bảng Vàng…');
   try {
     await saveAdminPlayer(pendingSave.payload);
     if (saveEpoch !== sessionEpoch) return;
-    setSaving(false);
+    setEditingBusy();
     closeEdit(true);
     status('admin-auth-status', 'Đã lưu thay đổi. Bảng Vàng công khai sẽ nhận thông tin mới khi tải lại.', 'success');
     auditOffset = 0;
@@ -360,7 +393,63 @@ $('admin-edit-form').addEventListener('submit', async (event) => {
   } catch (error) {
     if (saveEpoch === sessionEpoch && !handleAuthError(error)) status('admin-edit-status', errorMessage(error), 'error');
   } finally {
-    setSaving(false);
+    if (saveEpoch === sessionEpoch && saveMutation === editMutation) setEditingBusy();
+  }
+});
+
+$('admin-edit-delete').addEventListener('click', () => {
+  if (!editingPlayer || isEditingBusy() || !authenticated) return;
+  status('admin-edit-status');
+  setDiscardVisible(false);
+  setDeleteVisible(true);
+});
+
+$('admin-delete-cancel').addEventListener('click', () => {
+  if (isEditingBusy()) return;
+  setDeleteVisible(false);
+  status('admin-edit-status');
+  $('admin-edit-delete').focus();
+});
+
+$('admin-delete-confirm').addEventListener('click', async () => {
+  if (!editingPlayer || isEditingBusy() || !deleteConfirmation || !authenticated) return;
+  const reasonField = $('admin-edit-reason');
+  if (!reasonField.reportValidity()) return;
+  const reason = reasonField.value.normalize('NFC').trim();
+  if (!reason || Array.from(reason).length > 200) {
+    status('admin-edit-status', 'Hãy ghi lý do xóa, tối đa 200 ký tự.', 'error');
+    reasonField.focus();
+    return;
+  }
+  const signature = JSON.stringify({ id: editingPlayer.id, revision: editingPlayer.revision, reason });
+  if (!pendingDelete || pendingDelete.signature !== signature) {
+    pendingDelete = {
+      signature,
+      payload: {
+        id: editingPlayer.id,
+        expectedRevision: editingPlayer.revision,
+        requestId: crypto.randomUUID(),
+        reason,
+      },
+    };
+  }
+  const deleteEpoch = sessionEpoch;
+  const deleteMutation = ++editMutation;
+  const deletedName = editingPlayer.name;
+  setEditingBusy('delete');
+  status('admin-edit-status', 'Đang xóa người chơi…');
+  try {
+    await deleteAdminPlayer(pendingDelete.payload);
+    if (deleteEpoch !== sessionEpoch) return;
+    setEditingBusy();
+    closeEdit(true);
+    status('admin-auth-status', `Đã xóa người chơi “${deletedName}”. Bảng Vàng công khai sẽ cập nhật khi tải lại.`, 'success');
+    auditOffset = 0;
+    await Promise.allSettled([loadPlayers(), loadAudit()]);
+  } catch (error) {
+    if (deleteEpoch === sessionEpoch && !handleAuthError(error)) status('admin-edit-status', errorMessage(error), 'error');
+  } finally {
+    if (deleteEpoch === sessionEpoch && deleteMutation === editMutation) setEditingBusy();
   }
 });
 
@@ -410,7 +499,7 @@ $('admin-login-form').addEventListener('submit', async (event) => {
 });
 
 async function logout() {
-  if (loggingOut || saving) return;
+  if (loggingOut || isEditingBusy()) return;
   loggingOut = true;
   $('admin-logout').disabled = true;
   $('admin-login-signout').disabled = true;
@@ -433,7 +522,7 @@ $('admin-logout').addEventListener('click', () => { void logout(); });
 $('admin-login-signout').addEventListener('click', () => { void logout(); });
 
 window.addEventListener('beforeunload', (event) => {
-  if (editingPlayer && editSignature() !== originalEdit) { event.preventDefault(); event.returnValue = ''; }
+  if (editingPlayer && (isEditingBusy() || editSignature() !== originalEdit)) { event.preventDefault(); event.returnValue = ''; }
 });
 
 window.addEventListener('storage', (event) => {
