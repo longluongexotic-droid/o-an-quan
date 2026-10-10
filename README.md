@@ -1,8 +1,8 @@
-# Ô ăn quan — Ba nước đi
+# Trạng Nguyên Kỳ Lộ
 
-Game web tiếng Việt, một thế cờ duy nhất. Người chơi nhập tên trước khi bắt đầu, rồi đi ba lượt liên tiếp để ăn được nhiều quân nhất. Không có đối thủ AI. Giao diện có hoạt ảnh từng quân, âm thanh tùy chọn, hoàn tác, chơi lại và lời giải ở bảng kết quả.
+**Ngược dòng tuổi thơ.** Game ô ăn quan tiếng Việt với một thế cờ duy nhất. Người chơi ghi danh trước khi bắt đầu; mỗi ván có ba lượt liên tiếp để ăn được nhiều quân nhất, không có lượt của đối thủ. Giao diện có hoạt ảnh từng quân và âm thanh tùy chọn; không có hoàn tác, gợi ý hay lời giải.
 
-Bản công khai: [longluongexotic-droid.github.io/o-an-quan](https://longluongexotic-droid.github.io/o-an-quan/). **Sổ vàng** hiển thị 20 người có điểm cao nhất từ database chung trên Supabase; người ở các thiết bị khác đều đọc cùng bảng xếp hạng.
+Bản công khai: [longluongexotic-droid.github.io/o-an-quan](https://longluongexotic-droid.github.io/o-an-quan/). **Bảng Vàng** hiển thị 10 người có điểm cao nhất từ database chung trên Supabase. Hạng 1 nhận danh hiệu **Trạng nguyên**, hạng 2 nhận danh hiệu **Thám hoa**.
 
 ## Chạy trên máy
 
@@ -12,21 +12,29 @@ Chạy `npm ci` rồi `npm test` để kiểm tra luật, client bảng xếp h�
 
 Giao diện dùng giấy ngà, mực đỏ nâu và bàn gỗ với dân ba sắc sỏi, quan bằng ngọc. Quân rải theo vòng cung, quân bị ăn bay về bảng điểm và hiện số điểm cộng.
 
-Font tiêu đề là **SG85-Saigon 1985** nguyên bản của Thái Hiếu, tự lưu ở `docs/fonts/SAIGON1985.ttf`. [Nguồn tác giả và điều kiện sử dụng](https://fontzin.com/10-font-sai-gon-xua/) cho phép dùng cá nhân, thương mại và nhúng web; cấm bán lại hoặc chỉnh sửa font. Readme tác giả được giữ ở `docs/fonts/README-ThaiHieu.txt`. Đoạn hướng dẫn và luật dùng font serif hệ thống để dễ đọc.
+Font tiêu đề là **SG85-Saigon 1985** nguyên bản của Thái Hiếu, tự lưu ở `docs/fonts/SAIGON1985.ttf`. [Nguồn tác giả và điều kiện sử dụng](https://fontzin.com/10-font-sai-gon-xua/) cho phép dùng cá nhân, thương mại và nhúng web; cấm bán lại hoặc chỉnh sửa font. Readme tác giả được giữ ở `docs/fonts/README-ThaiHieu.txt`. Nội dung, tên người chơi và luật dùng **Noto Serif** tự lưu trong `docs/fonts/`, kèm giấy phép SIL Open Font License ở `OFL-NotoSerif.txt`; Sài Gòn 1985 chỉ dùng cho tiêu đề.
 
 ## Bảng xếp hạng và Supabase
 
-Tên dài 1–24 ký tự, hỗ trợ tiếng Việt, được chuẩn hóa khoảng trắng và từ chối ký tự điều khiển/ẩn. Supabase Anonymous Auth tạo danh tính khách riêng cho mỗi trình duyệt; không cần email hay mật khẩu. Những người trùng tên vẫn có điểm riêng.
+Tên dài 1–24 ký tự, hỗ trợ tiếng Việt, được chuẩn hóa Unicode và khoảng trắng, từ chối ký tự điều khiển/ẩn. Mỗi tên là **duy nhất toàn hệ thống**, không phân biệt chữ hoa/thường, và **không thể đổi sau khi ghi danh**. Supabase Anonymous Auth tạo danh tính khách riêng cho trình duyệt; không cần email hay mật khẩu.
 
-Sau mỗi ván hoàn tất, game tự gửi chuỗi nước đi. Server đối chiếu với 275 chuỗi kết thúc hợp lệ của màn chơi và tự lấy điểm; không tin điểm do trình duyệt gửi. Mỗi danh tính giữ **điểm cao nhất**. Ván thấp hơn không làm giảm kỷ lục; tên mới vẫn được cập nhật. Nếu hòa điểm, người đạt điểm ấy trước xếp trên, sau đó dùng ID ổn định để phân thứ tự.
+Mỗi tên được **bắt đầu tối đa 3 ván**. Ván mới được tính ngay khi server tạo ván; mở lại trang hoặc gửi lại cùng yêu cầu không trừ thêm ván. Ván đang chơi phải tiếp tục từ nước đã lưu, không thể bỏ ván để đặt lại bàn cờ. Chỉ có thể mở ván tiếp theo sau khi ván hiện tại kết thúc và còn lượt chơi.
 
-Tên, phiên khách và kết quả đang chờ gửi được lưu trong trình duyệt. Khi mất mạng, game giữ ván chờ có điểm cao nhất và thử gửi lại khi có mạng; người chơi cũng có nút thử lại. Xóa dữ liệu trình duyệt hoặc đổi thiết bị tạo danh tính mới, không khôi phục danh tính/điểm cũ để tiếp tục cập nhật. Điểm đã gửi vẫn nằm trên bảng xếp hạng.
+Cần kết nối mạng để ghi danh, mở ván và đi từng nước. Server lưu chuỗi nước đi sau mỗi nước được chấp nhận; tải lại trang khôi phục đúng ván và tiến trình đó. Khi kết nối gián đoạn, game yêu cầu kết nối lại và đồng bộ trạng thái trước khi chơi tiếp. Yêu cầu mở ván và nước đi có kiểm tra retry để không ghi hai lần.
+
+Server kiểm tra từng tiền tố nước đi dựa trên **275 chuỗi kết thúc hợp lệ**, gồm các trường hợp kết thúc sớm, rồi tự chốt điểm khi ván hoàn tất. Trình duyệt không được tự ghi điểm hay thay thế chuỗi đã lưu. Bảng Vàng giữ **điểm cao nhất** trong các ván của tên đó; nếu hòa điểm, người đạt điểm ấy trước xếp trên, sau đó dùng ID ổn định để phân thứ tự.
+
+Phiên khách được lưu trong trình duyệt. Xóa dữ liệu trình duyệt hoặc dùng thiết bị khác tạo danh tính mới và **không thể nhận lại tên đã được giữ**; cần dùng đúng trình duyệt còn phiên cũ để tiếp tục. Tên, điểm và số ván đã dùng vẫn được giữ trên server.
+
+Đợt nâng cấp bảo toàn 9 hồ sơ điểm cũ. Vì bản trước không lưu số ván đã chơi, mỗi tên cũ được tính **một ván lịch sử đã dùng**, còn hai ván mới. Các tên cũ trùng sau chuẩn hóa được gộp: giữ điểm cao nhất và thời điểm sớm nhất đạt điểm đó, liên kết các danh tính cũ vào cùng tên và cùng hạn mức. Bảng dữ liệu điểm cũ được giữ nguyên.
 
 Để cấu hình vào một project Supabase khác:
 
-1. Chạy [`supabase/migrations/202610090001_leaderboard.sql`](supabase/migrations/202610090001_leaderboard.sql) bằng SQL Editor với quyền chủ database. Migration tạo bảng private và hai RPC: `oaq_top20()` cho khách đọc, `oaq_submit_score(p_name, p_moves)` chỉ cho người đã có phiên xác thực nộp điểm.
+1. Chạy [`202610090001_leaderboard.sql`](supabase/migrations/202610090001_leaderboard.sql), sau đó [`202610100001_ky_lo.sql`](supabase/migrations/202610100001_ky_lo.sql) bằng SQL Editor với quyền chủ database. Project đã có migration đầu chỉ cần áp dụng migration thứ hai. Các bảng tên, hạn mức, ván và đường đi đều private; client chỉ gọi RPC được cấp quyền.
 2. Bật **Anonymous Sign-Ins** trong Authentication của project. Kiểm tra các Auth hooks hiện có cho phép loại người dùng này nếu project được dùng chung với ứng dụng khác.
 3. Đặt Project URL và **publishable key** (hoặc legacy `anon` key) trong [`docs/leaderboard-config.mjs`](docs/leaderboard-config.mjs), rồi xuất bản `docs/` lên GitHub Pages. Đây là cấu hình công khai cho trình duyệt; **không đưa secret key, service-role key hoặc token quản trị vào frontend/Git**.
+
+RPC hiện hành: `oaq_top10()` cho khách đọc; `oaq_player_status()`, `oaq_register_player(p_name)`, `oaq_start_game(p_request_id)` và `oaq_play_move(p_game_id, p_expected_moves, p_move)` yêu cầu phiên xác thực. Các RPC ghi trả hồ sơ, số ván và chuỗi nước đi chuẩn trên server. `oaq_submit_score` cũ đã bị thu hồi quyền; `oaq_top20()` chỉ còn là wrapper của top10 để tương thích đọc.
 
 `node scripts/generate-leaderboard-paths.mjs` kiểm tra seed khớp engine; `--write` tạo lại phần seed trước khi áp dụng migration mới. Nếu thay luật hoặc thế cờ, cần phiên bản màn chơi và migration mới để giữ đúng ý nghĩa của điểm cũ.
 
@@ -38,15 +46,15 @@ Giữ cách rải nối tiếp, ăn qua ô trống và ăn liên hoàn của ô 
 
 Luật tham khảo: https://arxiv.org/html/2507.03711v1, phần III. Phần giới hạn ba lượt là biến thể giải đố của game này.
 
-Chuỗi tối ưu duy nhất: ô3 sang phải (+3), ô5 sang trái (+16), ô5 sang phải (+19), tổng38 điểm. Nước ăn nhiều nhất ngay lượt đầu (+13) chỉ có thể đạt tối đa28 điểm sau ba lượt.
+Engine duyệt toàn bộ cây ba lượt để xác nhận mức tối đa **38 điểm** và một chuỗi tối ưu duy nhất. Nước ăn nhiều nhất ngay lượt đầu (+13) chỉ có thể đạt tối đa 28 điểm sau ba lượt; kiểm thử độc lập xác nhận kết quả này.
 
 ## Mã nguồn
 
 - `engine.mjs`: luật thuần JavaScript, giải bằng duyệt toàn bộ cây ba lượt; provenance của thế cờ nằm trong `PUZZLE_PROVENANCE`.
-- `engine.test.mjs`: 10 kiểm thử về bảo toàn quân, rải nối tiếp, chững quan, ăn liên hoàn, quan trống dân, đặt lại quân, kết thúc sớm và lời giải độc lập.
+- `engine.test.mjs`: kiểm thử bảo toàn quân, rải nối tiếp, chững quan, ăn liên hoàn, quan trống dân, đặt lại quân, kết thúc sớm và lời giải độc lập.
 - `docs/engine.mjs`: bản engine dùng trong game; đồng bộ từ `engine.mjs` khi sửa luật.
 - `docs/app.mjs`: điều khiển game và đăng ký WebMCP nếu trình duyệt hỗ trợ.
-- `docs/leaderboard.mjs`, `docs/leaderboard-config.mjs`: phiên khách, đọc hạng và nộp chuỗi nước đi lên Supabase.
+- `docs/leaderboard.mjs`, `docs/leaderboard-config.mjs`: phiên khách, ghi danh, số ván, lưu từng nước và đọc Bảng Vàng trên Supabase.
 - `supabase/migrations/`, `scripts/generate-leaderboard-paths.mjs`, `tests/`: database, seed chuỗi hợp lệ và kiểm thử bảng xếp hạng.
 - `docs/index.html`, `docs/style.css`: giao diện responsive; `docs/motion.css`: lớp hiệu ứng chuyển động.
 

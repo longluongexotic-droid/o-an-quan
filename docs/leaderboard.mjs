@@ -29,7 +29,7 @@ function configuration() {
   const url = SUPABASE_CONFIG.url?.trim().replace(/\/+$/, '');
   const publicKey = SUPABASE_CONFIG.publicKey?.trim();
   if (!url || !publicKey) {
-    throw new LeaderboardError('Bảng xếp hạng đang chờ kết nối. Bạn vẫn có thể chơi.', 'NOT_CONFIGURED');
+    throw new LeaderboardError('Trò chơi đang chờ kết nối máy chủ. Cần kết nối trực tuyến trước khi chơi.', 'NOT_CONFIGURED');
   }
   let parsed;
   try { parsed = new URL(url); } catch { /* Report a useful configuration error below. */ }
@@ -67,7 +67,7 @@ function storedSession(config) {
   let value;
   try { value = JSON.parse(raw); } catch { /* Preserve an existing identity instead of replacing it. */ }
   if (!validSession(value)) {
-    throw new LeaderboardError('Không thể khôi phục phiên lưu điểm trên trình duyệt này. Lượt chơi vẫn được giữ trên màn hình.', 'SESSION_INVALID');
+    throw new LeaderboardError('Không thể khôi phục phiên chơi trên trình duyệt này. Chưa thể tiếp tục ván chơi.', 'SESSION_INVALID');
   }
   memorySession = value;
   return value;
@@ -102,16 +102,28 @@ function aborted() {
 function apiError(status, data, context) {
   if (status === 429) return new LeaderboardError('Đã gửi quá nhiều yêu cầu. Vui lòng chờ một lát rồi thử lại.', 'RATE_LIMIT');
   if (context === 'refresh' && (status === 400 || status === 401 || status === 403)) {
-    return new LeaderboardError('Phiên lưu điểm đã hết hiệu lực. Điểm đã lưu vẫn còn trên bảng xếp hạng; lượt này chưa gửi được.', 'SESSION_EXPIRED');
+    return new LeaderboardError('Phiên chơi đã hết hiệu lực. Dữ liệu đã lưu vẫn còn trên máy chủ; chưa thể tiếp tục ván chơi.', 'SESSION_EXPIRED');
   }
   if (context === 'signup' && (data?.code === 'anonymous_provider_disabled' || data?.error_code === 'anonymous_provider_disabled')) {
-    return new LeaderboardError('Dịch vụ lưu điểm chưa bật đăng nhập khách. Bạn vẫn có thể chơi.', 'AUTH_DISABLED');
+    return new LeaderboardError('Máy chủ chưa bật đăng nhập khách. Chưa thể bắt đầu ván chơi.', 'AUTH_DISABLED');
   }
-  if (context === 'submit' && data?.code === '22023') {
-    return new LeaderboardError('Không thể xác nhận lượt chơi này. Hãy chơi lại rồi gửi kết quả.', 'INVALID_GAME');
+  const gameErrors = {
+    NAME_LOCKED: 'Tên của bạn đã được chốt và không thể thay đổi.',
+    NAME_TAKEN: 'Tên này đã có người dùng. Hãy chọn tên khác.',
+    ATTEMPT_LIMIT: 'Bạn đã dùng đủ 3 lần chơi. Điểm tốt nhất của bạn đã được giữ lại.',
+    GAME_CONFLICT: 'Ván chơi đã thay đổi ở cửa sổ khác. Hãy tải lại ván để tiếp tục.',
+    NAME_REQUIRED: 'Bạn cần đăng ký tên trước khi bắt đầu chơi.',
+    INVALID_MOVE: 'Nước đi này không hợp lệ. Hãy đồng bộ lại ván chơi rồi thử lại.',
+  };
+  if (data?.code === 'P0001' && Object.hasOwn(gameErrors, data.message)) {
+    return new LeaderboardError(gameErrors[data.message], data.message);
+  }
+  if (data?.code === '22023') {
+    if (context === 'register') return new LeaderboardError('Tên đăng ký không hợp lệ. Hãy nhập tên từ 1 đến 24 ký tự.', 'INVALID_NAME');
+    return new LeaderboardError('Không thể xác nhận yêu cầu này. Hãy đồng bộ lại ván chơi rồi thử lại.', 'INVALID_GAME');
   }
   if (status === 401 || status === 403) return new LeaderboardError('Chưa thể xác thực quyền truy cập bảng xếp hạng. Vui lòng thử lại.', 'AUTHORIZATION');
-  if (status === 404 || data?.code === 'PGRST202') return new LeaderboardError('Dịch vụ bảng xếp hạng chưa sẵn sàng. Bạn vẫn có thể chơi.', 'NOT_READY');
+  if (status === 404 || data?.code === 'PGRST202') return new LeaderboardError('Máy chủ trò chơi chưa sẵn sàng. Cần kết nối trực tuyến trước khi chơi.', 'NOT_READY');
   return new LeaderboardError('Chưa kết nối được bảng xếp hạng. Vui lòng thử lại sau.', 'SERVER');
 }
 
@@ -136,10 +148,10 @@ async function request(config, path, body, { token, signal, context = 'read' } =
     if (!response.ok) throw apiError(response.status, data, context);
     return data;
   } catch (error) {
-    if (timedOut) throw new LeaderboardError('Kết nối quá chậm. Vui lòng thử lại; điểm trên màn hình vẫn được giữ.', 'TIMEOUT');
+    if (timedOut) throw new LeaderboardError('Kết nối quá chậm. Vui lòng thử lại để đồng bộ ván chơi.', 'TIMEOUT');
     if (signal?.aborted) throw aborted();
     if (error instanceof LeaderboardError) throw error;
-    throw new LeaderboardError('Không có kết nối mạng. Vui lòng thử lại khi có mạng.', 'NETWORK');
+    throw new LeaderboardError('Cần kết nối mạng để chơi. Vui lòng thử lại khi có mạng.', 'NETWORK');
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', cancel);
@@ -203,7 +215,7 @@ function validScore(score) {
 }
 
 function responseError() {
-  return new LeaderboardError('Dữ liệu bảng xếp hạng không hợp lệ. Vui lòng thử lại.', 'INVALID_RESPONSE');
+  return new LeaderboardError('Dữ liệu trò chơi không hợp lệ. Vui lòng đồng bộ lại rồi thử lại.', 'INVALID_RESPONSE');
 }
 
 async function rpc(config, name, body, session, signal, context) {
@@ -218,11 +230,11 @@ async function rpc(config, name, body, session, signal, context) {
   }
 }
 
-export async function fetchTop20({ signal } = {}) {
+export async function fetchTop10({ signal } = {}) {
   const config = configuration();
   const session = await identity(config, { signal });
-  const data = await rpc(config, 'oaq_top20', {}, session, signal, 'read');
-  if (!Array.isArray(data) || data.length > 20) throw responseError();
+  const data = await rpc(config, 'oaq_top10', {}, session, signal, 'read');
+  if (!Array.isArray(data) || data.length > 10) throw responseError();
   return data.map((row, index) => {
     let name;
     try { name = normalizePlayerName(row?.name); } catch { throw responseError(); }
@@ -233,19 +245,71 @@ export async function fetchTop20({ signal } = {}) {
   });
 }
 
-export async function submitScore({ name, moves, signal } = {}) {
-  const cleanName = normalizePlayerName(name);
-  if (!Array.isArray(moves) || !moves.length || moves.length > 3 || moves.some(move => !move
-    || !Number.isInteger(move.pit) || move.pit < 7 || move.pit > 11 || (move.direction !== 1 && move.direction !== -1))) {
-    throw new LeaderboardError('Lượt chơi không hợp lệ. Hãy hoàn thành ván chơi trước khi gửi điểm.', 'INVALID_GAME');
+const UUID_PATTERN = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
+
+function validMove(move) {
+  return move && typeof move === 'object' && Number.isInteger(move.pit)
+    && move.pit >= 7 && move.pit <= 11 && (move.direction === 1 || move.direction === -1);
+}
+
+function cleanMoves(moves) {
+  return moves.map(({ pit, direction }) => ({ pit, direction }));
+}
+
+function profileFromResponse(data, { nullable = false } = {}) {
+  if (data === null && nullable) return null;
+  let name;
+  try { name = normalizePlayerName(data?.name); } catch { throw responseError(); }
+  if (!Number.isInteger(data.attempts_used) || data.attempts_used < 0 || data.attempts_used > 3
+    || data.attempts_left !== 3 - data.attempts_used || (data.best_score !== null && !validScore(data.best_score))) throw responseError();
+  let game = null;
+  if (data.active_game !== null) {
+    if (data.attempts_used === 0) throw responseError();
+    const value = data.active_game;
+    if (!value || typeof value.id !== 'string' || !UUID_PATTERN.test(value.id)
+      || !Array.isArray(value.moves) || value.moves.length > 3 || value.moves.some(move => !validMove(move))
+      || (value.status !== 'active' && value.status !== 'completed')
+      || (value.score !== null && !validScore(value.score))) throw responseError();
+    if (value.status === 'completed' && (value.moves.length < 2 || !validScore(value.score)
+      || !validScore(data.best_score) || data.best_score < value.score)) throw responseError();
+    if (value.status === 'active' && (value.moves.length >= 3 || value.score !== null)) throw responseError();
+    game = { id: value.id, moves: cleanMoves(value.moves), status: value.status, score: value.score };
   }
+  return { name, attempts_used: data.attempts_used, attempts_left: data.attempts_left, best_score: data.best_score, active_game: game };
+}
+
+async function playerRpc(name, body, { signal, context = 'status', nullable = false } = {}) {
   const config = configuration();
   const session = await identity(config, { create: true, signal });
-  const data = await rpc(config, 'oaq_submit_score', {
-    p_name: cleanName,
-    p_moves: moves.map(({ pit, direction }) => ({ pit, direction })),
-  }, session, signal, 'submit');
-  if (!validScore(data?.score) || !validScore(data?.best_score) || data.best_score < data.score
-    || typeof data?.improved !== 'boolean' || (data.improved && data.best_score !== data.score)) throw responseError();
-  return { score: data.score, best_score: data.best_score, improved: data.improved };
+  const data = await rpc(config, name, body, session, signal, context);
+  return profileFromResponse(data, { nullable });
+}
+
+export async function getPlayerStatus({ signal } = {}) {
+  return playerRpc('oaq_player_status', {}, { signal, nullable: true });
+}
+
+export async function registerPlayer({ name, signal } = {}) {
+  return playerRpc('oaq_register_player', { p_name: normalizePlayerName(name) }, { signal, context: 'register' });
+}
+
+export async function startGame({ requestId, signal } = {}) {
+  if (typeof requestId !== 'string' || !UUID_PATTERN.test(requestId)) {
+    throw new LeaderboardError('Mã yêu cầu bắt đầu ván không hợp lệ. Vui lòng thử lại.', 'INVALID_GAME');
+  }
+  return playerRpc('oaq_start_game', { p_request_id: requestId }, { signal, context: 'start' });
+}
+
+export async function playGameMove({ gameId, expectedMoves, move, signal } = {}) {
+  if (typeof gameId !== 'string' || !UUID_PATTERN.test(gameId)) {
+    throw new LeaderboardError('Mã ván chơi không hợp lệ. Vui lòng đồng bộ lại ván chơi.', 'INVALID_GAME');
+  }
+  if (!Array.isArray(expectedMoves) || expectedMoves.length > 2 || expectedMoves.some(value => !validMove(value)) || !validMove(move)) {
+    throw new LeaderboardError('Nước đi không hợp lệ. Vui lòng đồng bộ lại ván chơi rồi thử lại.', 'INVALID_MOVE');
+  }
+  return playerRpc('oaq_play_move', {
+    p_game_id: gameId,
+    p_expected_moves: cleanMoves(expectedMoves),
+    p_move: { pit: move.pit, direction: move.direction },
+  }, { signal, context: 'move' });
 }
