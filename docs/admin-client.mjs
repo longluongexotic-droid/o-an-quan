@@ -3,6 +3,8 @@ import { normalizePlayerName } from './leaderboard.mjs';
 
 const UUID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i;
 const TIMEOUT = 12000;
+// A public account identifier, never a password or privileged key.
+const ADMIN_ACCOUNT = 'quanly@trangnguyenkylo.invalid';
 let memorySession = null;
 let authRequest = null;
 let logoutRequest = null;
@@ -66,7 +68,7 @@ function fromResponse(data, previous) {
 }
 function serverError(response, data) {
   const messages = {
-    ADMIN_REQUIRED: ['Email này không có quyền quản lý Bảng Vàng.', 'FORBIDDEN'],
+    ADMIN_REQUIRED: ['Tài khoản này không có quyền quản lý Bảng Vàng.', 'FORBIDDEN'],
     ADMIN_CONFLICT: ['Hồ sơ đã thay đổi. Hãy tải lại dữ liệu trước khi chỉnh sửa.', 'CONFLICT'],
     NAME_TAKEN: ['Tên này đã có người dùng. Hãy chọn tên khác.', 'NAME_TAKEN'],
     PLAYER_NOT_FOUND: ['Không tìm thấy người chơi. Hãy tải lại danh sách.', 'NOT_FOUND'],
@@ -75,8 +77,7 @@ function serverError(response, data) {
     INVALID_NAME: ['Tên cần có 1–24 ký tự hợp lệ.', 'INVALID_NAME'],
   };
   if (messages[data?.message]) return new AdminError(...messages[data.message]);
-  if (response.status === 429 || data?.error_code === 'over_email_send_rate_limit') return new AdminError('Đã đạt giới hạn gửi liên kết. Hãy chờ một lát rồi thử lại.', 'RATE_LIMIT');
-  if (data?.code === 'email_address_not_authorized' || data?.error_code === 'email_address_not_authorized') return new AdminError('Dịch vụ email chưa cho phép gửi tới địa chỉ này. Cần cấu hình email trên Supabase.', 'EMAIL_DELIVERY');
+  if (response.status === 429) return new AdminError('Đã thử đăng nhập quá nhiều lần. Hãy chờ một lát rồi thử lại.', 'RATE_LIMIT');
   if (response.status === 401) return new AdminError('Phiên quản trị đã hết hạn. Hãy đăng nhập lại.', 'AUTHORIZATION');
   if (response.status === 403 || data?.code === '42501') return new AdminError('Bạn không có quyền quản lý Bảng Vàng.', 'FORBIDDEN');
   if (data?.code === '22023') return new AdminError('Thông tin chỉnh sửa không hợp lệ. Hãy kiểm tra lại.', 'INVALID_INPUT');
@@ -95,8 +96,14 @@ async function request(c, path, { body, token, method = 'POST' } = {}) {
     let data = null;
     try { if (raw) data = JSON.parse(raw); } catch { if (response.ok) throw invalid(); }
     if (!response.ok) {
-      if (path.startsWith('/auth/v1/token?') && [400, 401, 403].includes(response.status)) {
-        throw new AdminError('Phiên quản trị đã hết hạn. Hãy đăng nhập lại bằng liên kết mới.', 'AUTHORIZATION');
+      if (path === '/auth/v1/token?grant_type=password' && [400, 401, 403].includes(response.status)) {
+        if (data?.code === 'email_not_confirmed' || data?.error_code === 'email_not_confirmed') {
+          throw new AdminError('Tài khoản quản lý chưa được thiết lập xong.', 'NOT_READY');
+        }
+        throw new AdminError('Mật khẩu quản lý không đúng. Hãy nhập lại.', 'INVALID_PASSWORD');
+      }
+      if (path === '/auth/v1/token?grant_type=refresh_token' && [400, 401, 403].includes(response.status)) {
+        throw new AdminError('Phiên quản trị đã hết hạn. Hãy đăng nhập lại.', 'AUTHORIZATION');
       }
       throw serverError(response, data);
     }
@@ -144,29 +151,28 @@ function adminStatus(data) {
   return { email: data.email };
 }
 
-export async function sendLoginLink({ email } = {}) {
-  if (typeof email !== 'string' || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) throw new AdminError('Hãy nhập email hợp lệ.', 'INVALID_EMAIL');
-  const redirect = new URL('./admin.html', globalThis.location.href);
-  redirect.search = '';redirect.hash = '';
-  if (redirect.protocol !== 'https:' && !(redirect.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(redirect.hostname))) throw new AdminError('Đường dẫn đăng nhập không hợp lệ.', 'CONFIGURATION');
-  await request(config(), `/auth/v1/otp?redirect_to=${encodeURIComponent(redirect.href)}`, { body: { email: email.trim().toLowerCase(), create_user: true } });
-}
-export async function consumeLoginCallback() {
-  const hash = new URLSearchParams(globalThis.location.hash.slice(1));
-  if (!hash.has('access_token') && !hash.has('refresh_token') && !hash.has('error') && !hash.has('error_code')) return false;
-  // Remove credentials before any asynchronous work or link navigation.
-  globalThis.history.replaceState(null, '', globalThis.location.pathname + globalThis.location.search);
-  if (hash.has('error') || hash.has('error_code')) throw new AdminError('Liên kết đăng nhập không hợp lệ hoặc đã hết hạn. Hãy gửi liên kết mới.', 'LOGIN_EXPIRED');
+export async function signInAdmin({ password } = {}) {
+  if (typeof password !== 'string' || password.length === 0 || password.length > 1024) {
+    throw new AdminError('Hãy nhập mật khẩu quản lý.', 'INVALID_PASSWORD');
+  }
   const c = config();
-  const access = hash.get('access_token');
-  const refresh = hash.get('refresh_token');
-  const seconds = Number(hash.get('expires_in'));
-  if (!access || access.length >= 16384 || !refresh || refresh.length >= 16384 || !Number.isFinite(seconds) || seconds <= 0 || seconds > 86400) throw invalid();
-  const user = await request(c, '/auth/v1/user', { method: 'GET', token: access });
-  if (!user || !UUID.test(user.id) || user.is_anonymous !== false || !date(user.email_confirmed_at)) throw new AdminError('Cần xác minh email trước khi quản lý Bảng Vàng.', 'FORBIDDEN');
-  adminStatus(await request(c, '/rest/v1/rpc/oaq_admin_status', { body: {}, token: access }));
-  save(c, fromResponse({ access_token: access, refresh_token: refresh, expires_in: seconds, user }));
-  return true;
+  if (logoutRequest) { try { await logoutRequest; } catch { /* The prior local session has been cleared. */ } }
+  const login = async () => {
+    const data = await request(c, '/auth/v1/token?grant_type=password', { body: { email: ADMIN_ACCOUNT, password } });
+    const next = fromResponse(data);
+    const user = await request(c, '/auth/v1/user', { method: 'GET', token: next.access_token });
+    if (!user || user.id !== next.user_id || user.email?.toLowerCase() !== ADMIN_ACCOUNT
+      || user.is_anonymous !== false || !date(user.email_confirmed_at)) {
+      throw new AdminError('Tài khoản này không có quyền quản lý Bảng Vàng.', 'FORBIDDEN');
+    }
+    const admin = adminStatus(await request(c, '/rest/v1/rpc/oaq_admin_status', { body: {}, token: next.access_token }));
+    save(c, next);
+    return admin;
+  };
+  if (authRequest) { try { await authRequest; } catch { /* A fresh login can recover an expired session. */ } }
+  const locks = globalThis.navigator?.locks;
+  authRequest = locks ? locks.request(c.storageKey, { mode: 'exclusive', signal: AbortSignal.timeout(TIMEOUT) }, login) : login();
+  try { return await authRequest; } finally { authRequest = null; }
 }
 export async function getAdminStatus() {
   const c = config();

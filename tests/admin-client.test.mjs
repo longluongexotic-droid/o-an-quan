@@ -10,7 +10,8 @@ const PLAYER_ID = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
 const OTHER_ID = 'ffffffff-bbbb-cccc-dddd-eeeeeeeeeeee';
 const REQUEST_ID = '01234567-89ab-cdef-0123-456789abcdef';
 const AUDIT_ID = 'a1234567-89ab-cdef-0123-456789abcdef';
-const EMAIL = 'admin@example.com';
+const EMAIL = 'quanly@trangnguyenkylo.invalid';
+const PASSWORD = 'test-password-only';
 const STAMP = '2026-10-10T10:00:00.123456+00:00';
 const ADMIN_URL = 'https://games.example.test/o-an-quan/admin.html';
 let importNumber = 0;
@@ -33,10 +34,6 @@ const player = (overrides = {}) => ({
 const edit = (overrides = {}) => ({
   id: PLAYER_ID, name: 'Nguyễn An', overrideEnabled: true, overrideScore: 28, isHidden: false,
   expectedRevision: 4, requestId: REQUEST_ID, reason: 'Điều chỉnh theo kết quả xác minh', ...overrides,
-});
-const callbackHash = (overrides = {}) => '#' + new URLSearchParams({
-  access_token: 'dummy-callback-access', refresh_token: 'dummy-callback-refresh', expires_in: '3600',
-  token_type: 'bearer', type: 'magiclink', ...overrides,
 });
 const auditEntry = (overrides = {}) => ({
   id: AUDIT_ID, created_at: STAMP, actor_email: EMAIL, player_name: 'Nguyễn An', action: 'update',
@@ -97,91 +94,108 @@ test('admin reads without a session never create a guest or alter the game ident
   assert.equal(storage.get(GAME_KEY), gameSession);
 });
 
-test('magic-link requests normalize email and send the exact OTP and redirect contract', async t => {
-  const { client, calls, storage, gameSession } = await fixture(t, {
-    href: ADMIN_URL + '?v=build#unrelated', fetch: async () => response({}),
-  });
-  await client.sendLoginLink({ email: '  ADMIN@EXAMPLE.COM  ' });
-  assert.deepEqual(calls, [{
-    url: `${PROJECT_URL}/auth/v1/otp?redirect_to=${encodeURIComponent(ADMIN_URL)}`,
-    method: 'POST', headers: { apikey: 'sb_publishable_dummy_test_key', 'Content-Type': 'application/json' },
-    body: { email: EMAIL, create_user: true },
-  }]);
-  assert.equal(storage.has(ADMIN_KEY), false);
-  assert.equal(storage.get(GAME_KEY), gameSession);
-});
-
-test('invalid emails and non-web redirects are rejected without sending mail', async t => {
-  const { client } = await fixture(t, { href: 'file:///tmp/admin.html' });
-  for (const email of [undefined, '', 'bad', 'a b@example.com', 'a'.repeat(255) + '@example.com']) {
-    await assert.rejects(client.sendLoginLink({ email }), error => error.code === 'INVALID_EMAIL');
-  }
-  await assert.rejects(client.sendLoginLink({ email: EMAIL }), error => error.code === 'CONFIGURATION');
-});
-
-test('callbacks remove credentials before I/O and persist only after verified server authorization', async t => {
+test('password sign-in sends the exact auth grant and persists only after verified server authorization', async t => {
+  const href = ADMIN_URL + '?v=build#bang-vang';
   const { client, calls, events, storage, gameSession } = await fixture(t, {
-    href: ADMIN_URL + '?v=build' + callbackHash(),
+    href,
     fetch: async (call, state) => {
-      assert.equal(globalThis.location.hash, '');
-      assert.equal(state.events[0].type, 'replaceState');
-      assert.equal(state.storage.has(ADMIN_KEY), false, 'Do not persist unverified tokens');
+      assert.equal(state.storage.has(ADMIN_KEY), false, 'Do not persist tokens before admin authorization');
+      if (call.url.includes('/auth/v1/token?')) return response(authResponse());
       return response(call.url.endsWith('/user') ? verifiedUser() : { email: EMAIL });
     },
   });
-  assert.equal(await client.consumeLoginCallback(), true);
-  assert.deepEqual(events[0], { type: 'replaceState', path: '/o-an-quan/admin.html?v=build' });
-  assert.deepEqual(calls.map(call => ({ url: call.url, method: call.method, token: call.headers.Authorization, body: call.body })), [
-    { url: `${PROJECT_URL}/auth/v1/user`, method: 'GET', token: 'Bearer dummy-callback-access', body: undefined },
-    { url: `${PROJECT_URL}/rest/v1/rpc/oaq_admin_status`, method: 'POST', token: 'Bearer dummy-callback-access', body: {} },
+  assert.deepEqual(await client.signInAdmin({ password: PASSWORD, email: 'ignored@example.test' }), { email: EMAIL });
+  assert.deepEqual(calls, [
+    {
+      url: `${PROJECT_URL}/auth/v1/token?grant_type=password`, method: 'POST',
+      headers: { apikey: 'sb_publishable_dummy_test_key', 'Content-Type': 'application/json' },
+      body: { email: EMAIL, password: PASSWORD },
+    },
+    {
+      url: `${PROJECT_URL}/auth/v1/user`, method: 'GET',
+      headers: { apikey: 'sb_publishable_dummy_test_key', Authorization: 'Bearer dummy-new-access' },
+      body: undefined,
+    },
+    {
+      url: `${PROJECT_URL}/rest/v1/rpc/oaq_admin_status`, method: 'POST',
+      headers: { apikey: 'sb_publishable_dummy_test_key', Authorization: 'Bearer dummy-new-access', 'Content-Type': 'application/json' },
+      body: {},
+    },
   ]);
   const saved = JSON.parse(storage.get(ADMIN_KEY));
   assert.deepEqual(Object.keys(saved).sort(), ['access_token', 'expires_at', 'refresh_token', 'user_id']);
   assert.equal(saved.user_id, USER_ID);
-  assert.equal(saved.refresh_token, 'dummy-callback-refresh');
+  assert.equal(saved.refresh_token, 'dummy-new-refresh');
+  assert.equal(JSON.stringify([...storage]).includes(PASSWORD), false, 'Store tokens only, never the typed password');
+  assert.equal(calls.some(call => call.url.includes(PASSWORD)), false);
+  assert.equal(globalThis.location.href, href, 'Password authentication must not put credentials in navigation URLs');
+  assert.equal(events.some(event => event.type === 'replaceState'), false);
   assert.equal(storage.get(GAME_KEY), gameSession);
 });
 
-test('normal navigation does not consume an unrelated fragment or create authentication', async t => {
-  const { client, events } = await fixture(t, { href: ADMIN_URL + '#bang-vang' });
-  assert.equal(await client.consumeLoginCallback(), false);
-  assert.deepEqual(events, []);
+test('empty, non-string and oversized passwords are rejected before authentication or I/O', async t => {
+  const { client, calls, storage, gameSession } = await fixture(t);
+  for (const password of [undefined, null, 123, '', 'x'.repeat(4097)]) {
+    await assert.rejects(client.signInAdmin({ password }), error => error.code === 'INVALID_PASSWORD');
+  }
+  assert.deepEqual(calls, []);
+  assert.equal(storage.has(ADMIN_KEY), false);
+  assert.equal(storage.get(GAME_KEY), gameSession);
 });
 
-test('expired and malformed callback links clear the fragment without storing credentials', async t => {
-  for (const [hash, code] of [
-    ['#error=access_denied&error_code=otp_expired', 'LOGIN_EXPIRED'],
-    [callbackHash({ refresh_token: '' }), 'INVALID_RESPONSE'],
-    [callbackHash({ expires_in: '0' }), 'INVALID_RESPONSE'],
-    [callbackHash({ expires_in: '86401' }), 'INVALID_RESPONSE'],
-    [callbackHash({ expires_in: 'NaN' }), 'INVALID_RESPONSE'],
-  ]) await t.test(code + ' ' + hash.slice(0, 35), async sub => {
-    const { client, storage } = await fixture(sub, { href: ADMIN_URL + hash });
-    await assert.rejects(client.consumeLoginCallback(), error => error.code === code);
-    assert.equal(globalThis.location.hash, '');
-    assert.equal(storage.has(ADMIN_KEY), false);
+test('wrong passwords remain actionable and cannot replace an existing admin session', async t => {
+  const previous = JSON.stringify(session());
+  const { client, calls, storage, gameSession } = await fixture(t, {
+    initialSession: previous, fetch: async () => response({ code: 'invalid_credentials', message: 'Invalid login credentials' }, 400),
   });
+  await assert.rejects(client.signInAdmin({ password: PASSWORD }), error => error.code === 'INVALID_PASSWORD');
+  assert.equal(calls.length, 1);
+  assert.equal(storage.get(ADMIN_KEY), previous);
+  assert.equal(storage.get(GAME_KEY), gameSession);
 });
 
-test('anonymous, unverified, malformed or non-admin users cannot persist a callback session', async t => {
+test('anonymous, unverified, malformed or non-admin users cannot persist a password session', async t => {
   for (const overrides of [
     { is_anonymous: true }, { email_confirmed_at: null }, { email_confirmed_at: '42' }, { id: 'bad-id' },
+    { id: OTHER_ID }, { email: 'different@example.test' },
   ]) await t.test(JSON.stringify(overrides), async sub => {
-    const { client, storage, calls } = await fixture(sub, {
-      href: ADMIN_URL + callbackHash(), fetch: async () => response(verifiedUser(overrides)),
+    const { client, storage, calls, gameSession } = await fixture(sub, {
+      fetch: async call => response(call.url.includes('/auth/v1/token?') ? authResponse() : verifiedUser(overrides)),
     });
-    await assert.rejects(client.consumeLoginCallback(), error => error.code === 'FORBIDDEN');
-    assert.equal(calls.length, 1);
-    assert.equal(storage.has(ADMIN_KEY), false);
-  });
-  await t.test('verified account outside allowlist', async sub => {
-    const { client, storage, gameSession } = await fixture(sub, { href: ADMIN_URL + callbackHash(), fetch: async call => {
-      return call.url.endsWith('/user') ? response(verifiedUser()) : response({ code: '42501', message: 'ADMIN_REQUIRED' }, 403);
-    } });
-    await assert.rejects(client.consumeLoginCallback(), error => error.code === 'FORBIDDEN');
+    await assert.rejects(client.signInAdmin({ password: PASSWORD }), error => error.code === 'FORBIDDEN');
+    assert.equal(calls.length, 2);
     assert.equal(storage.has(ADMIN_KEY), false);
     assert.equal(storage.get(GAME_KEY), gameSession);
   });
+  await t.test('verified account outside allowlist', async sub => {
+    const { client, storage, calls, gameSession } = await fixture(sub, { fetch: async call => {
+      if (call.url.includes('/auth/v1/token?')) return response(authResponse());
+      return call.url.endsWith('/user') ? response(verifiedUser()) : response({ code: '42501', message: 'ADMIN_REQUIRED' }, 403);
+    } });
+    await assert.rejects(client.signInAdmin({ password: PASSWORD }), error => error.code === 'FORBIDDEN');
+    assert.equal(calls.length, 3);
+    assert.equal(storage.has(ADMIN_KEY), false);
+    assert.equal(storage.get(GAME_KEY), gameSession);
+  });
+});
+
+test('malformed token responses cannot persist a password session', async t => {
+  const { client, storage, calls } = await fixture(t, { fetch: async () => response(authResponse({ access_token: '' })) });
+  await assert.rejects(client.signInAdmin({ password: PASSWORD }), error => error.code === 'INVALID_RESPONSE');
+  assert.equal(calls.length, 1);
+  assert.equal(storage.has(ADMIN_KEY), false);
+});
+
+test('password errors distinguish incomplete setup and server rate limits', async t => {
+  let next;
+  const { client, storage, gameSession } = await fixture(t, { fetch: async () => response(next[0], next[1]) });
+  for (next of [
+    [{ error_code: 'invalid_credentials' }, 400, 'INVALID_PASSWORD'],
+    [{ code: 'email_not_confirmed' }, 400, 'NOT_READY'],
+    [{ code: 'over_request_rate_limit' }, 429, 'RATE_LIMIT'],
+  ]) await assert.rejects(client.signInAdmin({ password: PASSWORD }), error => error.code === next[2]);
+  assert.equal(storage.has(ADMIN_KEY), false);
+  assert.equal(storage.get(GAME_KEY), gameSession);
 });
 
 test('expired admin sessions refresh while preserving the user and game session', async t => {
@@ -277,6 +291,26 @@ test('logout racing a pending refresh cannot restore an admin session afterwards
   assert.equal(await client.getAdminStatus(), null);
 });
 
+test('logout racing a pending password login leaves no admin session afterwards', async t => {
+  let releaseLogin;
+  let startedLogin;
+  const loginGate = new Promise(resolve => { releaseLogin = resolve; });
+  const loginStarted = new Promise(resolve => { startedLogin = resolve; });
+  const { client, storage, gameSession } = await fixture(t, { locks: true, fetch: async call => {
+    if (call.url.includes('/auth/v1/token?')) { startedLogin();await loginGate;return response(authResponse()); }
+    if (call.url.includes('/logout?')) return response(null, 204);
+    return response(call.url.endsWith('/user') ? verifiedUser() : { email: EMAIL });
+  } });
+  const login = client.signInAdmin({ password: PASSWORD });
+  await loginStarted;
+  const logout = client.signOutAdmin();
+  releaseLogin();
+  await Promise.all([login, logout]);
+  assert.equal(storage.has(ADMIN_KEY), false);
+  assert.equal(storage.get(GAME_KEY), gameSession);
+  assert.equal(await client.getAdminStatus(), null);
+});
+
 test('player searches send normalized pagination and return only public admin fields', async t => {
   const { client, calls } = await fixture(t, { initialSession: session(), fetch: async () => response({
     players: [{ ...player(), private_user_id: USER_ID }], total: 51,
@@ -350,17 +384,16 @@ test('audit history validates consistent player identities, names and UUID entry
   }
 });
 
-test('server authorization, conflict and email delivery errors remain actionable', async t => {
+test('server authorization, conflict and rate-limit errors remain actionable', async t => {
   const errors = [
     [{ message: 'ADMIN_REQUIRED', code: '42501' }, 403, 'FORBIDDEN'],
     [{ message: 'ADMIN_CONFLICT', code: 'P0001' }, 400, 'CONFLICT'],
     [{ message: 'ADMIN_REQUEST_CONFLICT', code: 'P0001' }, 400, 'CONFLICT'],
     [{ message: 'NAME_TAKEN', code: 'P0001' }, 400, 'NAME_TAKEN'],
     [{ message: 'PLAYER_NOT_FOUND', code: 'P0001' }, 400, 'NOT_FOUND'],
-    [{ code: 'email_address_not_authorized' }, 400, 'EMAIL_DELIVERY'],
-    [{ code: 'over_email_send_rate_limit' }, 429, 'RATE_LIMIT'],
+    [{ code: 'over_request_rate_limit' }, 429, 'RATE_LIMIT'],
   ];
   let next;
   const { client } = await fixture(t, { initialSession: session(), fetch: async () => response(next[0], next[1]) });
-  for (next of errors) await assert.rejects(client.sendLoginLink({ email: EMAIL }), error => error.code === next[2]);
+  for (next of errors) await assert.rejects(client.fetchAdminPlayers(), error => error.code === next[2]);
 });

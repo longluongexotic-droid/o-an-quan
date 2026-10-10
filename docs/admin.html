@@ -10,7 +10,7 @@
   <link rel="preload" href="./fonts/SAIGON1985.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="preload" href="./fonts/NotoSerif-vietnamese.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="./style.css?v=ky-lo-2">
-  <link rel="stylesheet" href="./admin.css?v=admin-1">
+  <link rel="stylesheet" href="./admin.css?v=admin-password-1">
 </head>
 <body>
   <div class="page admin-page">
@@ -28,15 +28,14 @@
       <section id="admin-login" class="admin-panel login-panel" aria-labelledby="login-title" hidden>
         <p class="eyebrow">DÀNH CHO NGƯỜI QUẢN LÝ</p>
         <h2 id="login-title">Mở sổ Bảng Vàng</h2>
-        <p>Nhận liên kết đăng nhập qua email. Chỉ tài khoản được cấp quyền mới có thể chỉnh sửa.</p>
+        <p>Nhập mật khẩu quản lý để chỉnh sửa Bảng Vàng.</p>
         <form id="admin-login-form">
-          <label for="admin-email">Email quản lý</label>
-          <input id="admin-email" name="email" type="email" autocomplete="email" placeholder="Email quản trị" maxlength="254" required>
-          <button id="admin-login-submit" class="admin-primary" type="submit">Gửi liên kết đăng nhập <span aria-hidden="true">→</span></button>
+          <label for="admin-password">Mật khẩu quản lý</label>
+          <input id="admin-password" name="password" type="password" autocomplete="current-password" placeholder="Nhập mật khẩu quản lý" required>
+          <button id="admin-login-submit" class="admin-primary" type="submit">Đăng nhập <span aria-hidden="true">→</span></button>
         </form>
         <p id="admin-login-status" class="admin-inline-status" role="status" aria-live="polite"></p>
         <button id="admin-login-signout" class="admin-text-button" type="button" hidden>Đăng xuất tài khoản hiện tại ↗</button>
-        <p class="admin-fineprint">Mở liên kết trong email để quay lại trang này. Không cần nhập mật khẩu.</p>
       </section>
 
       <section id="admin-workspace" aria-label="Công cụ quản lý Bảng Vàng" hidden>
@@ -80,6 +79,6 @@
       <div id="admin-edit-actions" class="admin-edit-actions"><button id="admin-edit-cancel" class="admin-secondary" type="button">Hủy</button><button id="admin-edit-save" class="admin-primary" type="submit">Lưu thay đổi →</button></div>
     </form>
   </dialog>
-  <script type="module" src="./admin.mjs?v=admin-1"></script>
+  <script type="module" src="./admin.mjs?v=admin-password-1"></script>
 </body>
 </html>

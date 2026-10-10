@@ -40,7 +40,7 @@ RPC hiện hành: `oaq_top10()` cho khách đọc; `oaq_player_status()`, `oaq_r
 
 ## Trang quản lý Bảng Vàng
 
-Mở [trang quản lý](https://longluongexotic-droid.github.io/o-an-quan/admin.html), nhập email được cấp quyền, rồi mở liên kết Supabase gửi qua email. Trang quản lý dùng phiên đăng nhập riêng, không thay danh tính khách hoặc tiến độ của người chơi trên cùng trình duyệt.
+Mở [trang quản lý](https://longluongexotic-droid.github.io/o-an-quan/admin.html) và nhập mật khẩu quản lý. Supabase Auth kiểm tra mật khẩu; không lưu mật khẩu trong mã web, URL hoặc bộ nhớ trình duyệt. Trang quản lý dùng phiên đăng nhập riêng, không thay danh tính khách hoặc tiến độ của người chơi trên cùng trình duyệt.
 
 Quản trị viên có thể tìm tất cả người đã ghi danh, sửa tên, đặt điểm hiển thị từ 0–38 (hoặc gỡ điểm), và ẩn/khôi phục người khỏi Bảng Vàng. Tên vẫn phải duy nhất. Mỗi lần lưu cần lý do và được ghi lịch sử trước/sau; xung đột dữ liệu được phát hiện, gửi lại cùng yêu cầu không tạo lần sửa trùng.
 
@@ -49,9 +49,9 @@ Quản trị viên có thể tìm tất cả người đã ghi danh, sửa tên,
 Thiết lập trên project khác:
 
 1. Chạy [`202610100002_admin.sql`](supabase/migrations/202610100002_admin.sql) sau hai migration game.
-2. Chủ project thêm email quản trị vào `oaq_private.admin_allowlist` bằng SQL Editor. Không cần public email hay đưa secret key vào mã web.
-3. Giữ bật xác minh email; thêm URL chính xác của `admin.html` vào Authentication → URL Configuration và đặt Site URL tương ứng. Backend kiểm tra email đã xác minh trong `auth.users`, từ chối người dùng anonymous và mọi email ngoài allowlist trên từng RPC quản trị.
-4. Đăng nhập bằng liên kết email. [SMTP mặc định của Supabase](https://supabase.com/docs/guides/auth/auth-smtp) chỉ gửi tới email thành viên tổ chức và có giới hạn thấp; nếu dùng email khác, cấu hình SMTP riêng. Không tắt xác minh email để thay thế.
+2. Chạy [`202610100003_admin_password.sql`](supabase/migrations/202610100003_admin_password.sql) để cấp quyền cho tài khoản nội bộ `quanly@trangnguyenkylo.invalid`. Địa chỉ này chỉ là mã tài khoản công khai, không nhận email và không phải thông tin bí mật.
+3. Trong Authentication → Users → Add user → Create new user, chủ project tự tạo đúng tài khoản nội bộ trên, đặt mật khẩu riêng và bật **Auto Confirm User**. Không đưa mật khẩu, secret key hoặc service-role key vào mã nguồn. Giữ bật xác minh email toàn project; backend vẫn kiểm tra tài khoản đã xác minh, từ chối người dùng anonymous và tài khoản ngoài allowlist trên từng RPC quản trị.
+4. Đăng nhập bằng mật khẩu ở trang quản lý. Không cần gửi email hay cấu hình SMTP. Nếu đổi mã tài khoản nội bộ, cập nhật đồng thời `ADMIN_ACCOUNT` trong client và allowlist private.
 
 `docs/admin.html`, `docs/admin.css`, `docs/admin.mjs` là giao diện; `docs/admin-client.mjs` xử lý đăng nhập và RPC. Các bảng quyền, yêu cầu lưu và lịch sử chỉnh sửa đều private; người chơi chỉ được đọc Bảng Vàng công khai như trước.
 

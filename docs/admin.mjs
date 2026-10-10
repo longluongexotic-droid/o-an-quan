@@ -1,12 +1,11 @@
 import {
-  consumeLoginCallback,
   fetchAdminAudit,
   fetchAdminPlayers,
   getAdminStatus,
   saveAdminPlayer,
-  sendLoginLink,
+  signInAdmin,
   signOutAdmin,
-} from './admin-client.mjs?v=admin-1';
+} from './admin-client.mjs?v=admin-password-1';
 
 const $ = (id) => document.getElementById(id);
 const pageSize = 20;
@@ -43,6 +42,9 @@ function errorMessage(error) {
     FORBIDDEN: 'Tài khoản này chưa được cấp quyền quản lý Bảng Vàng.',
     UNAUTHORIZED: 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.',
     AUTHORIZATION: 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.',
+    INVALID_PASSWORD: 'Mật khẩu quản lý chưa đúng. Hãy thử lại.',
+    INVALID_CREDENTIALS: 'Mật khẩu quản lý chưa đúng. Hãy thử lại.',
+    invalid_credentials: 'Mật khẩu quản lý chưa đúng. Hãy thử lại.',
     ADMIN_CONFLICT: 'Thông tin đã được sửa ở nơi khác. Đóng cửa sổ này và làm mới danh sách trước khi chỉnh lại.',
     GAME_CONFLICT: 'Thông tin đã thay đổi. Đóng cửa sổ này và làm mới danh sách trước khi chỉnh lại.',
     NAME_TAKEN: 'Tên này đã thuộc về một người chơi khác. Hãy chọn tên khác.',
@@ -99,7 +101,7 @@ function handleAuthError(error) {
   setSignedOut();
   $('admin-login-signout').hidden = false;
   status('admin-auth-status', errorMessage(error), 'error');
-  status('admin-login-status', 'Đăng xuất tài khoản hiện tại, rồi yêu cầu liên kết đăng nhập mới.');
+  status('admin-login-status', 'Nhập mật khẩu quản lý để đăng nhập lại.');
   return true;
 }
 
@@ -203,7 +205,7 @@ function renderAudit(entries) {
     heading.append(time);
     item.append(heading, element('p', 'admin-audit-changes', auditChanges(entry)));
     if (entry.reason) item.append(element('p', '', `Lý do: ${entry.reason}`));
-    if (entry.actor_email) item.append(element('p', 'admin-audit-actor', `Người sửa: ${entry.actor_email}`));
+    if (entry.actor_email) item.append(element('p', 'admin-audit-actor', 'Người sửa: Quản trị viên'));
     fragment.append(item);
   }
   $('admin-audit-list').replaceChildren(fragment);
@@ -392,14 +394,17 @@ $('admin-audit-next').addEventListener('click', () => { if (!auditLoading && aud
 $('admin-login-form').addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!$('admin-login-form').reportValidity()) return;
+  if ($('admin-login-submit').disabled) return;
   $('admin-login-submit').disabled = true;
-  status('admin-login-status', 'Đang gửi liên kết đăng nhập…');
+  status('admin-login-status', 'Đang đăng nhập…');
   try {
-    await sendLoginLink({ email: $('admin-email').value.trim() });
-    status('admin-login-status', 'Đã yêu cầu liên kết đăng nhập. Kiểm tra hộp thư đến và thư rác, rồi mở liên kết trong email.', 'success');
+    await signInAdmin({ password: $('admin-password').value });
+    status('admin-login-status');
+    await initialize();
   } catch (error) {
     status('admin-login-status', errorMessage(error), 'error');
   } finally {
+    $('admin-password').value = '';
     $('admin-login-submit').disabled = false;
   }
 });
@@ -443,12 +448,11 @@ window.addEventListener('storage', (event) => {
 
 async function initialize() {
   try {
-    await consumeLoginCallback();
     const admin = await getAdminStatus();
     if (!admin) { setSignedOut(); status('admin-auth-status'); return; }
     authenticated = true;
     sessionEpoch += 1;
-    $('admin-current-email').textContent = admin.email;
+    $('admin-current-email').textContent = 'Quản trị viên';
     $('admin-login').hidden = true;
     $('admin-workspace').hidden = false;
     status('admin-auth-status');
@@ -458,8 +462,13 @@ async function initialize() {
     setSignedOut();
     $('admin-login-signout').hidden = true;
     status('admin-auth-status', errorMessage(error), 'error');
-    status('admin-login-status', 'Bạn có thể yêu cầu một liên kết đăng nhập mới bằng biểu mẫu bên trên.');
+    status('admin-login-status', 'Nhập mật khẩu quản lý để thử đăng nhập lại.');
   }
 }
 
+// Discard credentials from legacy email links before making any requests.
+const legacyFragment = new URLSearchParams(location.hash.slice(1));
+if (['access_token', 'refresh_token', 'error', 'error_code'].some(key => legacyFragment.has(key))) {
+  history.replaceState(null, '', location.pathname + location.search);
+}
 void initialize();
