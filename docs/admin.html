@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#eee2c9">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Quản lý Bảng Vàng · Trạng Nguyên Kỳ Lộ</title>
+  <link rel="preload" href="./fonts/SAIGON1985.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="./fonts/NotoSerif-vietnamese.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="./style.css?v=ky-lo-2">
+  <link rel="stylesheet" href="./admin.css?v=admin-1">
+</head>
+<body>
+  <div class="page admin-page">
+    <header class="site-header">
+      <a class="brand" href="./" aria-label="Ngược dòng tuổi thơ, về trang chơi"><svg viewBox="0 0 46 30" aria-hidden="true"><rect x="1.5" y="2" width="43" height="26" rx="12"/><path d="M12 2v26m7-26v26m8-26v26m7-26v26M12 15h22"/><circle cx="15.5" cy="8.5" r="2"/></svg><span class="brand-name"><span>Ngược dòng</span> <span>tuổi thơ</span></span></a>
+      <a class="admin-back" href="./">Về bàn chơi <span aria-hidden="true">↗</span></a>
+    </header>
+    <main>
+      <section class="admin-intro" aria-labelledby="admin-title">
+        <div><p class="eyebrow">TRẠNG NGUYÊN KỲ LỘ</p><h1 id="admin-title">Quản lý Bảng Vàng<span class="title-dot">.</span></h1><p class="intro-copy">Chăm chút từng tên người chơi, lưu lại mỗi lần chỉnh sửa.</p></div>
+        <div class="admin-stamp" aria-hidden="true">SỔ<br>QUẢN<br>LÝ</div>
+      </section>
+
+      <p id="admin-auth-status" class="admin-notice" role="status" aria-live="polite">Đang kiểm tra phiên đăng nhập…</p>
+      <section id="admin-login" class="admin-panel login-panel" aria-labelledby="login-title" hidden>
+        <p class="eyebrow">DÀNH CHO NGƯỜI QUẢN LÝ</p>
+        <h2 id="login-title">Mở sổ Bảng Vàng</h2>
+        <p>Nhận liên kết đăng nhập qua email. Chỉ tài khoản được cấp quyền mới có thể chỉnh sửa.</p>
+        <form id="admin-login-form">
+          <label for="admin-email">Email quản lý</label>
+          <input id="admin-email" name="email" type="email" autocomplete="email" placeholder="Email quản trị" maxlength="254" required>
+          <button id="admin-login-submit" class="admin-primary" type="submit">Gửi liên kết đăng nhập <span aria-hidden="true">→</span></button>
+        </form>
+        <p id="admin-login-status" class="admin-inline-status" role="status" aria-live="polite"></p>
+        <button id="admin-login-signout" class="admin-text-button" type="button" hidden>Đăng xuất tài khoản hiện tại ↗</button>
+        <p class="admin-fineprint">Mở liên kết trong email để quay lại trang này. Không cần nhập mật khẩu.</p>
+      </section>
+
+      <section id="admin-workspace" aria-label="Công cụ quản lý Bảng Vàng" hidden>
+        <div class="admin-session"><span>Đang đăng nhập: <strong id="admin-current-email"></strong></span><button id="admin-logout" class="admin-text-button" type="button">Đăng xuất ↗</button></div>
+        <section class="admin-panel" aria-labelledby="players-title">
+          <div class="admin-section-heading"><div><p class="eyebrow">SỔ GHI DANH</p><h2 id="players-title">Người chơi</h2></div><span id="admin-player-count" class="admin-count">— người</span></div>
+          <div class="admin-tools">
+            <form id="admin-search-form" class="admin-search-form" role="search"><label for="admin-search" class="sr-only">Tìm người chơi theo tên</label><input id="admin-search" name="search" type="search" maxlength="80" placeholder="Tìm tên người chơi…"><button class="admin-secondary" type="submit">Tìm kiếm</button></form>
+            <button id="admin-refresh" class="admin-text-button" type="button">Làm mới ↻</button>
+          </div>
+          <p id="admin-players-status" class="admin-inline-status" role="status" aria-live="polite"></p>
+          <div class="admin-table-wrap"><table class="admin-table"><caption class="sr-only">Danh sách người chơi, điểm và trạng thái trên Bảng Vàng</caption><thead><tr><th scope="col">Người chơi</th><th scope="col">Điểm Bảng Vàng</th><th scope="col">Số ván</th><th scope="col">Bảng Vàng</th><th scope="col"><span class="sr-only">Thao tác</span></th></tr></thead><tbody id="admin-player-rows"></tbody></table></div>
+          <div class="admin-pagination"><button id="admin-players-prev" class="admin-secondary" type="button" disabled>← Trước</button><span id="admin-players-page" aria-live="polite">Trang 1</span><button id="admin-players-next" class="admin-secondary" type="button" disabled>Tiếp →</button></div>
+          <p class="admin-fineprint">Bảng Vàng công khai hiển thị 10 người có điểm cao nhất. Người bị ẩn vẫn giữ tên, điểm và lịch sử chơi.</p>
+        </section>
+
+        <section class="admin-panel audit-panel" aria-labelledby="audit-title">
+          <div class="admin-section-heading"><div><p class="eyebrow">DẤU MỰC CÒN LẠI</p><h2 id="audit-title">Lịch sử chỉnh sửa</h2></div><button id="admin-audit-refresh" class="admin-text-button" type="button">Làm mới ↻</button></div>
+          <p id="admin-audit-status" class="admin-inline-status" role="status" aria-live="polite"></p>
+          <ol id="admin-audit-list" class="admin-audit-list"></ol>
+          <div class="admin-pagination"><button id="admin-audit-prev" class="admin-secondary" type="button" disabled>← Trước</button><span id="admin-audit-page" aria-live="polite">Trang 1</span><button id="admin-audit-next" class="admin-secondary" type="button" disabled>Tiếp →</button></div>
+        </section>
+      </section>
+    </main>
+    <footer><span>Một trò chơi dân gian, một cách chơi mới.</span><span>Trạng Nguyên Kỳ Lộ · Sổ quản lý</span></footer>
+  </div>
+
+  <dialog id="admin-edit-dialog" class="admin-edit-dialog" aria-labelledby="admin-edit-title">
+    <button id="admin-edit-close" class="close-dialog" type="button" aria-label="Đóng chỉnh sửa">×</button>
+    <p class="eyebrow">CHỈNH SỬA GHI DANH</p><h2 id="admin-edit-title">Người chơi</h2>
+    <form id="admin-edit-form">
+      <label for="admin-edit-name">Tên người chơi</label><input id="admin-edit-name" name="name" type="text" maxlength="24" autocomplete="off" required aria-describedby="admin-edit-name-help"><small id="admin-edit-name-help">1–24 ký tự. Tên mới không được trùng người chơi khác.</small>
+      <p id="admin-edit-earned" class="admin-fineprint"></p>
+      <label class="admin-check-label" for="admin-edit-use-earned"><input id="admin-edit-use-earned" name="use-earned" type="checkbox"><span>Dùng điểm chơi thực</span></label>
+      <label for="admin-edit-score">Điểm Bảng Vàng</label><input id="admin-edit-score" name="score" type="number" min="0" max="38" step="1" inputmode="numeric" aria-describedby="admin-edit-score-help"><small id="admin-edit-score-help">Bỏ chọn “Dùng điểm chơi thực” để đặt điểm từ 0 đến 38. Để trống nếu muốn gỡ điểm khỏi Bảng Vàng.</small>
+      <label class="admin-check-label" for="admin-edit-hidden"><input id="admin-edit-hidden" name="hidden" type="checkbox"><span>Ẩn người chơi khỏi Bảng Vàng</span></label>
+      <p id="admin-edit-attempts" class="admin-fineprint"></p>
+      <label for="admin-edit-reason">Lý do chỉnh sửa</label><textarea id="admin-edit-reason" name="reason" rows="2" maxlength="200" placeholder="Ví dụ: Sửa tên ghi nhầm" required></textarea>
+      <p id="admin-edit-status" class="admin-inline-status" role="status" aria-live="polite"></p>
+      <div id="admin-discard-panel" class="admin-discard-panel" hidden><p>Bạn có thay đổi chưa lưu. Bỏ các thay đổi này?</p><div><button id="admin-edit-continue" class="admin-secondary" type="button">Tiếp tục chỉnh</button><button id="admin-edit-discard" class="admin-danger" type="button">Bỏ thay đổi</button></div></div>
+      <div id="admin-edit-actions" class="admin-edit-actions"><button id="admin-edit-cancel" class="admin-secondary" type="button">Hủy</button><button id="admin-edit-save" class="admin-primary" type="submit">Lưu thay đổi →</button></div>
+    </form>
+  </dialog>
+  <script type="module" src="./admin.mjs?v=admin-1"></script>
+</body>
+</html>

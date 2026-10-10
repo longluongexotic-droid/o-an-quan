@@ -38,6 +38,23 @@ RPC hiện hành: `oaq_top10()` cho khách đọc; `oaq_player_status()`, `oaq_r
 
 `node scripts/generate-leaderboard-paths.mjs` kiểm tra seed khớp engine; `--write` tạo lại phần seed trước khi áp dụng migration mới. Nếu thay luật hoặc thế cờ, cần phiên bản màn chơi và migration mới để giữ đúng ý nghĩa của điểm cũ.
 
+## Trang quản lý Bảng Vàng
+
+Mở [trang quản lý](https://longluongexotic-droid.github.io/o-an-quan/admin.html), nhập email được cấp quyền, rồi mở liên kết Supabase gửi qua email. Trang quản lý dùng phiên đăng nhập riêng, không thay danh tính khách hoặc tiến độ của người chơi trên cùng trình duyệt.
+
+Quản trị viên có thể tìm tất cả người đã ghi danh, sửa tên, đặt điểm hiển thị từ 0–38 (hoặc gỡ điểm), và ẩn/khôi phục người khỏi Bảng Vàng. Tên vẫn phải duy nhất. Mỗi lần lưu cần lý do và được ghi lịch sử trước/sau; xung đột dữ liệu được phát hiện, gửi lại cùng yêu cầu không tạo lần sửa trùng.
+
+Điểm quản trị chỉ điều chỉnh bảng xếp hạng; điểm chơi thực, lịch sử ván và giới hạn 3 ván vẫn được giữ. Bỏ chọn “Dùng điểm chơi thực” để đặt điểm riêng; bật lại để dùng kết quả game. Điểm đặt riêng tiếp tục được áp dụng cho đến khi quản trị viên chọn lại điểm chơi thực. Người bị ẩn vẫn giữ tên và lịch sử.
+
+Thiết lập trên project khác:
+
+1. Chạy [`202610100002_admin.sql`](supabase/migrations/202610100002_admin.sql) sau hai migration game.
+2. Chủ project thêm email quản trị vào `oaq_private.admin_allowlist` bằng SQL Editor. Không cần public email hay đưa secret key vào mã web.
+3. Giữ bật xác minh email; thêm URL chính xác của `admin.html` vào Authentication → URL Configuration và đặt Site URL tương ứng. Backend kiểm tra email đã xác minh trong `auth.users`, từ chối người dùng anonymous và mọi email ngoài allowlist trên từng RPC quản trị.
+4. Đăng nhập bằng liên kết email. [SMTP mặc định của Supabase](https://supabase.com/docs/guides/auth/auth-smtp) chỉ gửi tới email thành viên tổ chức và có giới hạn thấp; nếu dùng email khác, cấu hình SMTP riêng. Không tắt xác minh email để thay thế.
+
+`docs/admin.html`, `docs/admin.css`, `docs/admin.mjs` là giao diện; `docs/admin-client.mjs` xử lý đăng nhập và RPC. Các bảng quyền, yêu cầu lưu và lịch sử chỉnh sửa đều private; người chơi chỉ được đọc Bảng Vàng công khai như trước.
+
 ## Màn chơi và cách tính điểm
 
 Thế cờ được tái tạo từ bốn nước đi hợp lệ xen kẽ của một ván chuẩn. Xuất phát có 38 dân và hai quan còn trên bàn; mỗi bên đã ăn 6 dân. Điểm thử thách bắt đầu từ 0.
