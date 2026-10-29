@@ -1,12 +1,11 @@
-import { INITIAL_STATE, TURN_LIMIT, cloneState, legalMoves, playMove, solve } from './engine.mjs';
-import { normalizePlayerName, fetchTop10, getPlayerStatus, registerPlayer, startGame, playGameMove } from './leaderboard.mjs?v=ky-lo-2';
+import { INITIAL_STATE, TURN_LIMIT, cloneState, legalMoves, playMove } from './engine.mjs';
+import { normalizePlayerName, getPlayerStatus, registerPlayer, startGame, playGameMove } from './leaderboard.mjs?v=ky-lo-2';
 
 const $ = selector => document.querySelector(selector);
-const optimal = solve(INITIAL_STATE, TURN_LIMIT);
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let state = cloneState(INITIAL_STATE), history = [], selected = null, direction = 1;
 let busy = false, skipAnimation = false, soundEnabled = false, audioContext;
-let playerName = '', profile = null, connected = false, rankingRequest = null;
+let playerName = '', profile = null, connected = false;
 const NAME_KEY = 'oaq:player-name', START_KEY = 'oaq:pending-start:v2';
 const pitNumber = pit => 12 - pit;
 const directionName = value => value === 1 ? 'trái' : 'phải';
@@ -173,8 +172,7 @@ function renderBoard(position = state, action = null) {
 }
 
 function renderScore(position = state, pendingScore = null) {
-  $('#score').textContent = String(position.score).padStart(2, '0');$('#target-score').textContent = `${optimal.maxScore} điểm`;
-  $('#score-progress').style.width = `${Math.min(100, position.score / optimal.maxScore * 100)}%`;
+  $('#score').textContent = String(position.score).padStart(2, '0');
   const captures = [...history.flatMap(turn => turn.result.captured), ...(pendingScore?.captured ?? [])];
   const civilians = captures.reduce((total, capture) => total + capture.civilians, 0), quan = captures.filter(capture => capture.quan).length;
   const cost = history.reduce((total, turn) => total + turn.result.cost, 0) + (pendingScore?.cost ?? 0);
@@ -290,18 +288,17 @@ async function executeMove(pit = selected, value = direction) {
   }
   clearMotion();state = result.state;history.push({ before, pit, direction: value, result });profile = updated;busy = false;render();
   $('#score').classList.remove('score-bump');void $('#score').offsetWidth;$('#score').classList.add('score-bump');
-  if (finished()) { message(`Ván chơi kết thúc. Bạn đạt ${state.score} / ${optimal.maxScore} điểm.`, 'good');showResult();void loadRanking({ fresh: true }); }
+  if (finished()) { message(`Ván chơi kết thúc. Bạn đạt ${state.score} điểm.`, 'good');showResult(); }
   else message(result.net > 0 ? `Nước vừa rồi ăn được ${result.gained} điểm${result.cost ? `, trừ ${result.cost} điểm đặt lại quân` : ''}. Còn ${TURN_LIMIT - state.turns} lượt — chọn ô tiếp theo.` : `Nước vừa rồi ${result.cost ? `tốn ${result.cost} điểm đặt lại quân và ` : ''}chưa ăn được quân. Còn ${TURN_LIMIT - state.turns} lượt.`, result.net > 0 ? 'good' : '');
   return { score: state.score, turn: state.turns, gained: result.gained, cost: result.cost, finished: finished(), board: state.board.slice(), quan: state.quan.slice() };
 }
 
 function showResult() {
   if (busy || !finished() || profile?.active_game?.status !== 'completed') return;
-  const perfect = state.score === optimal.maxScore;
-  $('#result-title').textContent = perfect ? 'Kỳ lộ vẹn toàn!' : state.score >= 28 ? 'Một thế cờ rất khá!' : 'Một ván cờ đáng nhớ.';
-  $('#result-score').textContent = state.score;$('#result-target').textContent = `/ ${optimal.maxScore} điểm`;
-  $('#result-copy').textContent = `${perfect ? 'Bạn đã ăn cả hai quan và đạt điểm cao nhất. ' : state.ended && state.turns < TURN_LIMIT ? 'Ván cờ kết thúc sớm. ' : ''}${profile.attempts_left ? `Bạn còn ${profile.attempts_left} ván để thử sức.` : 'Bạn đã hoàn thành cả 3 ván. Hãy xem thứ hạng của mình trên Bảng Vàng.'}`;
-  $('#score-submit-status').textContent = `Đã lưu vào Bảng Vàng. Điểm tốt nhất của bạn: ${profile.best_score}.`;
+  $('#result-title').textContent = 'Một ván cờ đáng nhớ.';
+  $('#result-score').textContent = state.score;
+  $('#result-copy').textContent = `${state.ended && state.turns < TURN_LIMIT ? 'Ván cờ kết thúc sớm. ' : ''}${profile.attempts_left ? `Bạn còn ${profile.attempts_left} ván để thử sức.` : 'Bạn đã hoàn thành cả 3 ván. Cảm ơn bạn đã tham gia thử thách.'}`;
+  $('#score-submit-status').textContent = `Đã lưu kết quả. Điểm tốt nhất của bạn: ${profile.best_score}.`;
   if (!$('#result-dialog').open) $('#result-dialog').showModal();
 }
 
@@ -409,38 +406,6 @@ async function beginGame() {
   }
 }
 
-function renderRanking(rows) {
-  const fragment = document.createDocumentFragment();
-  for (const row of rows) {
-    const tr = document.createElement('tr');tr.className = `rank-${row.rank}${row.is_me ? ' is-me' : ''}`;
-    const rankCell = document.createElement('td'), number = document.createElement('span');number.className = 'rank-number';number.textContent = row.rank;rankCell.append(number);
-    const nameCell = document.createElement('td'), player = document.createElement('span');player.className = 'rank-player-name';player.textContent = row.name;nameCell.append(player);
-    if (row.rank <= 2) { const title = document.createElement('span');title.className = `rank-title rank-title-${row.rank}`;title.textContent = row.rank === 1 ? 'Trạng nguyên' : 'Thám hoa';nameCell.append(title); }
-    if (row.is_me) { const tag = document.createElement('span');tag.className = 'you-tag';tag.textContent = 'Bạn';nameCell.append(tag); }
-    const points = document.createElement('td');points.className = 'points-column';points.textContent = row.score;
-    tr.append(rankCell, nameCell, points);fragment.append(tr);
-  }
-  $('#leaderboard-rows').replaceChildren(fragment);$('#leaderboard-table-wrap').hidden = !rows.length;
-}
-
-function loadRanking({ fresh = false } = {}) {
-  // A completed upload must not reuse a read that began before it was saved.
-  if (rankingRequest) return fresh ? rankingRequest.then(() => loadRanking()) : rankingRequest;
-  const status = $('#leaderboard-status');status.className = 'leaderboard-status';status.textContent = 'Đang tải bảng xếp hạng…';status.hidden = false;
-  $('#refresh-leaderboard').disabled = true;
-  rankingRequest = (async () => {
-    try {
-      const rows = await fetchTop10();renderRanking(rows);
-      status.textContent = rows.length ? '' : 'Chưa có người chơi ghi điểm. Hoàn thành thử thách để ghi tên đầu tiên.';status.hidden = !!rows.length;
-      return rows;
-    } catch (error) {
-      status.className = 'leaderboard-status error';status.textContent = error.message;status.hidden = false;
-      return null;
-    } finally { $('#refresh-leaderboard').disabled = false;rankingRequest = null; }
-  })();
-  return rankingRequest;
-}
-
 $('#pits').addEventListener('click', event => { const button = event.target.closest('[data-pit]');if (button && !button.disabled) selectPit(Number(button.dataset.pit), true); });
 $('#direction-left').addEventListener('click', () => setDirection(1));$('#direction-right').addEventListener('click', () => setDirection(-1));
 $('#play-button').addEventListener('click', () => { void executeMove().catch(error => message(error.message)); });
@@ -452,9 +417,8 @@ reducedMotion.addEventListener('change', event => { if (event.matches) stopMotio
 $('#sound-button').addEventListener('click', () => { soundEnabled = !soundEnabled;updateSoundButton();if (soundEnabled) sound('drop'); });
 $('#player-form').addEventListener('submit', enterPlayer);
 $('#player-dialog').addEventListener('cancel', event => { event.preventDefault(); });
-$('#refresh-leaderboard').addEventListener('click', () => { void loadRanking(); });
 $('#retry-connection').addEventListener('click', () => { void syncGame(); });
-window.addEventListener('online', () => { void loadRanking();if (!busy) void syncGame(); });
+window.addEventListener('online', () => { if (!busy) void syncGame(); });
 window.addEventListener('offline', () => { connected = false;$('#player-dialog').close();showConnectionError(new Error('Đã mất kết nối mạng.'));render(); });
 $('#rules-button').addEventListener('click', () => $('#rules-dialog').showModal());
 document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => document.getElementById(button.dataset.close).close()));
@@ -475,11 +439,11 @@ document.addEventListener('keydown', event => {
 if (document.modelContext?.registerTool) {
   const lifecycle = new AbortController();
   const register = tool => { try { void Promise.resolve(document.modelContext.registerTool(tool, { signal: lifecycle.signal })).catch(() => {}); } catch { /* Play stays available when the registry is unsupported. */ } };
-  register({ name: 'read_o_an_quan_position', title: 'Đọc thế cờ ô ăn quan', description: 'Read visible board, score, remaining turns and legal player moves without revealing a solution.', inputSchema: { type: 'object', properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, untrustedContentHint: false }, execute: () => ({ ...cloneState(state), playerName, gamesUsed: profile?.attempts_used ?? 0, gamesLeft: profile?.attempts_left ?? 3, remaining: Math.max(0, TURN_LIMIT - state.turns), busy, target: optimal.maxScore, legalMoves: canPlay() ? legalMoves(state).map(move => ({ cell: pitNumber(move.pit), direction: directionName(move.direction) })) : [] }) });
+  register({ name: 'read_o_an_quan_position', title: 'Đọc thế cờ ô ăn quan', description: 'Read visible board, score, remaining turns and legal player moves without revealing a solution.', inputSchema: { type: 'object', properties: {}, additionalProperties: false }, annotations: { readOnlyHint: true, untrustedContentHint: false }, execute: () => ({ ...cloneState(state), playerName, gamesUsed: profile?.attempts_used ?? 0, gamesLeft: profile?.attempts_left ?? 3, remaining: Math.max(0, TURN_LIMIT - state.turns), busy, legalMoves: canPlay() ? legalMoves(state).map(move => ({ cell: pitNumber(move.pit), direction: directionName(move.direction) })) : [] }) });
   register({ name: 'play_o_an_quan_move', title: 'Đi một nước ô ăn quan', description: 'Complete one move from player cell 1–5. Sow and capture, consume one of three turns, then return the updated score after animation.', inputSchema: { type: 'object', properties: { cell: { type: 'integer', minimum: 1, maximum: 5 }, direction: { type: 'string', enum: ['left', 'right'] } }, required: ['cell', 'direction'], additionalProperties: false }, annotations: { readOnlyHint: false, untrustedContentHint: false }, execute: async input => {
     if (!input || !Number.isInteger(input.cell) || input.cell < 1 || input.cell > 5 || !['left', 'right'].includes(input.direction) || Object.keys(input).some(key => !['cell', 'direction'].includes(key))) throw new Error('Cell must be 1–5 and direction must be left or right.');
     return executeMove(12 - input.cell, input.direction === 'left' ? 1 : -1);
   } });
   window.addEventListener('pagehide', () => lifecycle.abort(), { once: true });
 }
-render();void syncGame();void loadRanking();
+render();void syncGame();

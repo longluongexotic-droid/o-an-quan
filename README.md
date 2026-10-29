@@ -2,7 +2,7 @@
 
 **Ngược dòng tuổi thơ.** Game ô ăn quan tiếng Việt với một thế cờ duy nhất. Người chơi ghi danh trước khi bắt đầu; mỗi ván có ba lượt liên tiếp để ăn được nhiều quân nhất, không có lượt của đối thủ. Giao diện có hoạt ảnh từng quân và âm thanh tùy chọn; không có hoàn tác, gợi ý hay lời giải.
 
-Bản công khai: [longluongexotic-droid.github.io/o-an-quan](https://longluongexotic-droid.github.io/o-an-quan/). **Bảng Vàng** hiển thị 10 người có điểm cao nhất từ database chung trên Supabase. Hạng 1 nhận danh hiệu **Trạng nguyên**, hạng 2 nhận danh hiệu **Thám hoa**.
+Bản công khai: [longluongexotic-droid.github.io/o-an-quan](https://longluongexotic-droid.github.io/o-an-quan/). Trang người chơi chỉ hiển thị điểm của chính người chơi, không tải hoặc hiển thị **Bảng Vàng**, điểm tối đa hay thông báo đạt điểm tối đa. Kết quả vẫn lưu vào database chung trên Supabase để quản trị viên quản lý.
 
 ## Chạy trên máy
 
@@ -56,7 +56,7 @@ Thiết lập trên project khác:
 4. Đăng nhập bằng mật khẩu ở trang quản lý. Không cần gửi email hay cấu hình SMTP. Nếu đổi mã tài khoản nội bộ, cập nhật đồng thời `ADMIN_ACCOUNT` trong client và allowlist private.
 5. Chạy [`202610100004_admin_delete.sql`](supabase/migrations/202610100004_admin_delete.sql) để bật nút xóa người chơi và giữ lịch sử quản trị sau khi xóa. Migration chỉ thêm chức năng; dữ liệu người chơi chỉ bị xóa khi quản trị viên xác nhận thao tác trong giao diện.
 
-`docs/admin.html`, `docs/admin.css`, `docs/admin.mjs` là giao diện; `docs/admin-client.mjs` xử lý đăng nhập và RPC. Các bảng quyền, yêu cầu lưu và lịch sử chỉnh sửa đều private; người chơi chỉ được đọc Bảng Vàng công khai như trước.
+`docs/admin.html`, `docs/admin.css`, `docs/admin.mjs` là giao diện; `docs/admin-client.mjs` xử lý đăng nhập và RPC. Các bảng quyền, yêu cầu lưu và lịch sử chỉnh sửa đều private. Các RPC top10/top20 vẫn được giữ tương thích; trang người chơi không gọi hoặc hiển thị bảng xếp hạng.
 
 ## Màn chơi và cách tính điểm
 
